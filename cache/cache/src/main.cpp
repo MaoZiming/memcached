@@ -101,17 +101,28 @@ public:
         uint32_t flags;
         memcached_return_t result;
 
+#ifdef DEBUG
         std::cout << "Get: " << request->key() << std::endl;
+#endif
 
         value = memcached_get(memc, request->key().c_str(), request->key().size(), &value_length, &flags, &result);
         if (result == MEMCACHED_SUCCESS)
         {
+            cache_hits++;
+
+#ifdef DEBUG
             std::cout << "Cache Hit!" << std::endl;
+#endif
             response->set_value(std::string(value, value_length));
             response->set_success(true);
         }
         else
         {
+            cache_miss++;
+
+#ifdef DEBUG
+            std::cout << "Cache Miss!" << std::endl;
+#endif
             // Cache miss: fetch from the database
             std::string db_value = db_client_.Get(request->key());
             if (!db_value.empty())
@@ -120,8 +131,10 @@ public:
                 response->set_success(true);
 
                 // Optionally, cache the value for future requests
-                std::cout << "Cache: " << _ttl << std::endl;
-                memcached_set(memc, request->key().c_str(), request->key().size(), db_value.c_str(), db_value.size(), (time_t)_ttl, (uint32_t)0);
+#ifdef DEBUG
+                std::cout << "Cache: " << ttl_ << std::endl;
+#endif
+                memcached_set(memc, request->key().c_str(), request->key().size(), db_value.c_str(), db_value.size(), (time_t)ttl_, (uint32_t)0);
             }
             else
             {
@@ -140,8 +153,10 @@ public:
     {
         memcached_return_t result;
 
+#ifdef DEBUG
         std::cout << "Set: " << request->key() << ", " << request->value()
                   << ", TTL: " << request->ttl() << std::endl;
+#endif
 
         // Convert ttl to time_t. Using (time_t)request->ttl() is sufficient as it should be already in seconds.
         time_t ttl = static_cast<time_t>(request->ttl());
@@ -165,9 +180,11 @@ public:
     {
         memcached_return_t result;
 
+#ifdef DEBUG
         std::cout << "SetTTL: " << request->ttl() << std::endl;
+#endif
 
-        _ttl = request->ttl();
+        ttl_ = request->ttl();
         response->set_success(true);
 
         return grpc::Status::OK;
@@ -179,12 +196,14 @@ private:
     DBClient db_client_;
     // We assume a uniform ttl for the entire cache.
     // Default to no ttl requirement.
-    int32_t _ttl = 0;
+    int32_t ttl_ = 0;
+    int32_t cache_hits = 0;
+    int32_t cache_miss = 0;
 };
 
 void RunServer()
 {
-    std::string server_address("0.0.0.0:50051");
+    std::string server_address("10.128.0.34:50051");
     std::string db_address("10.128.0.33:50051");
     CacheServiceImpl service(grpc::CreateChannel(db_address, grpc::InsecureChannelCredentials()));
 
