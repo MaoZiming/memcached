@@ -54,35 +54,6 @@ public:
         return false;
     }
 
-    std::string Get(const std::string &key)
-    {
-        DBGetRequest request;
-        request.set_key(key);
-
-        DBGetResponse response;
-        ClientContext context;
-
-        Status status = stub_->Get(&context, request, &response);
-
-        if (status.ok())
-        {
-            if (response.found())
-            {
-                return response.value();
-            }
-            else
-            {
-                std::cerr << "Key not found." << std::endl;
-            }
-        }
-        else
-        {
-            std::cerr << "RPC failed." << std::endl;
-        }
-
-        return "";
-    }
-
     bool Delete(const std::string &key)
     {
         DBDeleteRequest request;
@@ -181,25 +152,6 @@ int main(int argc, char *argv[])
     std::string key = "example_key";
     std::string value = "example_value";
 
-    if (cache_client.Set(key, value))
-    {
-        std::cout << "Set key-value pair successfully." << std::endl;
-    }
-    else
-    {
-        std::cout << "Failed to set key-value pair." << std::endl;
-    }
-
-    std::string result = cache_client.Get(key);
-    if (!result.empty())
-    {
-        std::cout << "Got value: " << result << std::endl;
-    }
-    else
-    {
-        std::cout << "Failed to get value or key not found." << std::endl;
-    }
-
     // Put example
     if (db_client.Put(key, value))
     {
@@ -210,8 +162,7 @@ int main(int argc, char *argv[])
         std::cout << "Failed to put key-value pair." << std::endl;
     }
 
-    // Get example
-    result = db_client.Get(key);
+    std::string result = cache_client.Get(key);
     if (!result.empty())
     {
         std::cout << "Got value: " << result << std::endl;
