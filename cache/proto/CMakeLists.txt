@@ -7,6 +7,7 @@ find_package(Threads)
 #
 set(PROTO_FILES
     myproto/cache_service.proto
+    myproto/db_service.proto
 )
 
 #

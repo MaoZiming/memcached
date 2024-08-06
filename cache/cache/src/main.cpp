@@ -3,11 +3,11 @@
 #include <myproto/cache_service.pb.h>
 #include <myproto/cache_service.grpc.pb.h>
 
+using freshCache::CacheGetRequest;
+using freshCache::CacheGetResponse;
 using freshCache::CacheService;
-using freshCache::GetRequest;
-using freshCache::GetResponse;
-using freshCache::SetRequest;
-using freshCache::SetResponse;
+using freshCache::CacheSetRequest;
+using freshCache::CacheSetResponse;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
@@ -34,7 +34,7 @@ public:
         memcached_free(memc);
     }
 
-    grpc::Status Get(grpc::ServerContext *context, const GetRequest *request, GetResponse *response) override
+    grpc::Status Get(grpc::ServerContext *context, const CacheGetRequest *request, CacheGetResponse *response) override
     {
         char *value = nullptr;
         size_t value_length;
@@ -59,7 +59,7 @@ public:
         return grpc::Status::OK;
     }
 
-    grpc::Status Set(grpc::ServerContext *context, const SetRequest *request, SetResponse *response) override
+    grpc::Status Set(grpc::ServerContext *context, const CacheSetRequest *request, CacheSetResponse *response) override
     {
         memcached_return_t result;
 

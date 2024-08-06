@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package freshCache;
+
+service DBService {
+  rpc Put (DBPutRequest) returns (DBPutResponse);
+  rpc Get (DBGetRequest) returns (DBGetResponse);
+  rpc Delete (DBDeleteRequest) returns (DBDeleteResponse);
+}
+
+message DBPutRequest {
+  string key = 1;
+  string value = 2;
+}
+
+message DBPutResponse {
+  bool success = 1;
+}
+
+message DBGetRequest {
+  string key = 1;
+}
+
+message DBGetResponse {
+  string value = 1;
+  bool found = 2;
+}
+
+message DBDeleteRequest {
+  string key = 1;
+}
+
+message DBDeleteResponse {
+  bool success = 1;
+}
