@@ -5,6 +5,35 @@
 DBClient::DBClient(std::shared_ptr<Channel> channel)
     : stub_(DBService::NewStub(channel)) {}
 
+std::string DBClient::Get(const std::string &key)
+{
+    DBGetRequest request;
+    request.set_key(key);
+
+    DBGetResponse response;
+    ClientContext context;
+
+    Status status = stub_->Get(&context, request, &response);
+
+    if (status.ok())
+    {
+        if (response.found())
+        {
+            return response.value();
+        }
+        else
+        {
+            std::cerr << "Key not found." << std::endl;
+        }
+    }
+    else
+    {
+        std::cerr << "RPC failed." << std::endl;
+    }
+
+    return "";
+}
+
 bool DBClient::Put(const std::string &key, const std::string &value)
 {
     DBPutRequest request;

@@ -89,3 +89,24 @@ void CacheClient::SetTracker(Tracker *tracker)
 {
     tracker_ = tracker;
 }
+
+float CacheClient::GetMR(void)
+{
+    CacheGetMRRequest request;
+
+    CacheGetMRResponse response;
+    ClientContext context;
+
+    Status status = stub_->GetMR(&context, request, &response);
+
+    if (status.ok())
+    {
+        return response.mr();
+    }
+    else
+    {
+        std::cerr << "RPC failed." << std::endl;
+    }
+
+    return -1;
+}

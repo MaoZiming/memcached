@@ -24,11 +24,15 @@ bool Client::Set(const std::string &key, const std::string &value, int ttl)
         return false; // Or handle the error as needed
     }
 
-    // Set data in cache with optional TTL
-    return cache_client_->Set(key, value, ttl);
+    return true;
 }
 
 void Client::SetTTL(const int32_t &ttl)
 {
     cache_client_->SetTTL(ttl);
+}
+
+float Client::GetMR(void)
+{
+    return cache_client_->GetMR();
 }

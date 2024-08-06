@@ -15,6 +15,8 @@ using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 
+using freshCache::CacheGetMRRequest;
+using freshCache::CacheGetMRResponse;
 using freshCache::CacheGetRequest;
 using freshCache::CacheGetResponse;
 using freshCache::CacheService;
@@ -42,6 +44,7 @@ public:
     bool Put(const std::string &key, const std::string &value);
     bool Delete(const std::string &key);
     void SetTracker(Tracker *tracker);
+    std::string Get(const std::string &key);
 
 private:
     std::unique_ptr<DBService::Stub> stub_;
@@ -56,6 +59,7 @@ public:
     bool Set(const std::string &key, const std::string &value, int ttl = 0);
     bool SetTTL(const int32_t &ttl);
     void SetTracker(Tracker *tracker);
+    float GetMR(void);
 
 private:
     std::unique_ptr<CacheService::Stub> stub_;
@@ -69,6 +73,7 @@ public:
     std::string Get(const std::string &key);
     bool Set(const std::string &key, const std::string &value, int ttl = 0);
     void SetTTL(const int32_t &ttl);
+    float GetMR(void);
 
 private:
     std::unique_ptr<DBClient> db_client_;

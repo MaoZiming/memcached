@@ -16,8 +16,8 @@ int main(int argc, char *argv[])
                   &tracker);
 
     // Example usage of Set and Get
-    std::string key = "example_key";
-    std::string value = "example_value";
+    std::string key = "example_key3";
+    std::string value = "example_value2";
 
     client.SetTTL(1);
 
@@ -63,5 +63,6 @@ int main(int argc, char *argv[])
         std::cout << "Failed to get value or key not found." << std::endl;
     }
 
+    std::cout << "MR: " << client.GetMR() << std::endl;
     return 0;
 }

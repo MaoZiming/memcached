@@ -6,6 +6,7 @@ service CacheService {
     rpc Get(CacheGetRequest) returns (CacheGetResponse);
     rpc Set(CacheSetRequest) returns (CacheSetResponse);
     rpc SetTTL(CacheSetTTLRequest) returns (CacheSetTTLResponse);
+    rpc GetMR(CacheGetMRRequest) returns (CacheGetMRResponse);
 }
 
 message CacheSetTTLRequest {
@@ -33,4 +34,12 @@ message CacheSetRequest {
 
 message CacheSetResponse {
     bool success = 1;
+}
+
+message CacheGetMRRequest {
+}
+
+message CacheGetMRResponse{
+    float mr = 1;
+    bool success = 2;
 }

@@ -8,22 +8,8 @@
 #include <grpcpp/grpcpp.h>
 #include <iostream>
 #include <memory>
+#include "client.hpp"
 
-using freshCache::CacheGetRequest;
-using freshCache::CacheGetResponse;
-using freshCache::CacheService;
-using freshCache::CacheSetRequest;
-using freshCache::CacheSetResponse;
-using freshCache::CacheSetTTLRequest;
-using freshCache::CacheSetTTLResponse;
-
-using freshCache::DBDeleteRequest;
-using freshCache::DBDeleteResponse;
-using freshCache::DBGetRequest;
-using freshCache::DBGetResponse;
-using freshCache::DBPutRequest;
-using freshCache::DBPutResponse;
-using freshCache::DBService;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
@@ -32,45 +18,6 @@ using grpc::Status;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
-
-class DBClient
-{
-public:
-    DBClient(std::shared_ptr<Channel> channel)
-        : stub_(DBService::NewStub(channel)) {}
-
-    std::string Get(const std::string &key)
-    {
-        DBGetRequest request;
-        request.set_key(key);
-
-        DBGetResponse response;
-        ClientContext context;
-
-        Status status = stub_->Get(&context, request, &response);
-
-        if (status.ok())
-        {
-            if (response.found())
-            {
-                return response.value();
-            }
-            else
-            {
-                std::cerr << "Key not found." << std::endl;
-            }
-        }
-        else
-        {
-            std::cerr << "RPC failed." << std::endl;
-        }
-
-        return "";
-    }
-
-private:
-    std::unique_ptr<DBService::Stub> stub_;
-};
 
 class CacheServiceImpl final : public CacheService::Service
 {
@@ -105,10 +52,11 @@ public:
         std::cout << "Get: " << request->key() << std::endl;
 #endif
 
+        std::cout << request->key() << std::endl;
         value = memcached_get(memc, request->key().c_str(), request->key().size(), &value_length, &flags, &result);
         if (result == MEMCACHED_SUCCESS)
         {
-            cache_hits++;
+            cache_hits_++;
 
 #ifdef DEBUG
             std::cout << "Cache Hit!" << std::endl;
@@ -118,7 +66,7 @@ public:
         }
         else
         {
-            cache_miss++;
+            cache_miss_++;
 
 #ifdef DEBUG
             std::cout << "Cache Miss!" << std::endl;
@@ -190,6 +138,22 @@ public:
         return grpc::Status::OK;
     }
 
+    grpc::Status GetMR(grpc::ServerContext *context, const CacheGetMRRequest *request, CacheGetMRResponse *response) override
+    {
+        memcached_return_t result;
+
+        response->set_success(true);
+#ifdef DEBUG
+        std::cout << "cache_hits_: " << cache_hits_ << ", " << "cache_miss_: " << cache_miss_ << std::endl;
+#endif
+        if (cache_hits_ + cache_miss_ > 0)
+            response->set_mr(static_cast<float>(cache_miss_) / (cache_hits_ + cache_miss_));
+        else
+            response->set_mr(-1);
+
+        return grpc::Status::OK;
+    }
+
 private:
     memcached_st *memc;
     memcached_return rc;
@@ -197,8 +161,8 @@ private:
     // We assume a uniform ttl for the entire cache.
     // Default to no ttl requirement.
     int32_t ttl_ = 0;
-    int32_t cache_hits = 0;
-    int32_t cache_miss = 0;
+    int32_t cache_hits_ = 0;
+    int32_t cache_miss_ = 0;
 };
 
 void RunServer()
