@@ -22,31 +22,19 @@ int main(int argc, char *argv[])
     client.SetTTL(1);
 
     // Put example
-    if (client.Set(key, value))
-    {
-        std::cout << "Put key-value pair successfully." << std::endl;
-    }
-    else
+    if (!client.Set(key, value))
     {
         std::cout << "Failed to put key-value pair." << std::endl;
     }
 
     std::string result = client.Get(key);
-    if (!result.empty())
-    {
-        std::cout << "Got value: " << result << std::endl;
-    }
-    else
+    if (result.empty())
     {
         std::cout << "Failed to get value or key not found." << std::endl;
     }
 
     result = client.Get(key);
-    if (!result.empty())
-    {
-        std::cout << "Got value: " << result << std::endl;
-    }
-    else
+    if (result.empty())
     {
         std::cout << "Failed to get value or key not found." << std::endl;
     }
@@ -54,15 +42,12 @@ int main(int argc, char *argv[])
     sleep(2);
 
     result = client.Get(key);
-    if (!result.empty())
-    {
-        std::cout << "Got value: " << result << std::endl;
-    }
-    else
+    if (result.empty())
     {
         std::cout << "Failed to get value or key not found." << std::endl;
     }
 
     std::cout << "MR: " << client.GetMR() << std::endl;
+    std::cout << "Load: " << client.GetLoad() << std::endl;
     return 0;
 }

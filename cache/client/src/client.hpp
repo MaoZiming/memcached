@@ -27,6 +27,8 @@ using freshCache::CacheSetTTLResponse;
 
 using freshCache::DBDeleteRequest;
 using freshCache::DBDeleteResponse;
+using freshCache::DBGetLoadRequest;
+using freshCache::DBGetLoadResponse;
 using freshCache::DBGetRequest;
 using freshCache::DBGetResponse;
 using freshCache::DBPutRequest;
@@ -45,6 +47,7 @@ public:
     bool Delete(const std::string &key);
     void SetTracker(Tracker *tracker);
     std::string Get(const std::string &key);
+    float GetLoad(void);
 
 private:
     std::unique_ptr<DBService::Stub> stub_;
@@ -74,6 +77,7 @@ public:
     bool Set(const std::string &key, const std::string &value, int ttl = 0);
     void SetTTL(const int32_t &ttl);
     float GetMR(void);
+    float GetLoad(void);
 
 private:
     std::unique_ptr<DBClient> db_client_;

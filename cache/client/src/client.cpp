@@ -36,3 +36,8 @@ float Client::GetMR(void)
 {
     return cache_client_->GetMR();
 }
+
+float Client::GetLoad(void)
+{
+    return db_client_->GetLoad();
+}

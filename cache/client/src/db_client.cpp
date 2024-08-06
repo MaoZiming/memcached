@@ -87,3 +87,21 @@ void DBClient::SetTracker(Tracker *tracker)
 {
     tracker_ = tracker;
 }
+
+float DBClient::GetLoad(void)
+{
+    DBGetLoadRequest request;
+    DBGetLoadResponse response;
+    ClientContext context;
+    Status status = stub_->GetLoad(&context, request, &response);
+
+    if (status.ok())
+    {
+        return response.load();
+    }
+    else
+    {
+        std::cerr << "RPC failed." << std::endl;
+        return -1.0;
+    }
+}

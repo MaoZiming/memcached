@@ -6,6 +6,7 @@ service DBService {
   rpc Put (DBPutRequest) returns (DBPutResponse);
   rpc Get (DBGetRequest) returns (DBGetResponse);
   rpc Delete (DBDeleteRequest) returns (DBDeleteResponse);
+  rpc GetLoad(DBGetLoadRequest) returns (DBGetLoadResponse);
 }
 
 message DBPutRequest {
@@ -32,4 +33,13 @@ message DBDeleteRequest {
 
 message DBDeleteResponse {
   bool success = 1;
+}
+
+message DBGetLoadRequest {
+
+}
+
+message DBGetLoadResponse {
+  float load = 1;
+  bool success = 2;
 }
