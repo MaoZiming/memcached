@@ -12,6 +12,8 @@ using freshCache::CacheGetResponse;
 using freshCache::CacheService;
 using freshCache::CacheSetRequest;
 using freshCache::CacheSetResponse;
+using freshCache::CacheSetTTLRequest;
+using freshCache::CacheSetTTLResponse;
 
 using freshCache::DBDeleteRequest;
 using freshCache::DBDeleteResponse;
@@ -115,16 +117,39 @@ public:
         return "";
     }
 
-    bool Set(const std::string &key, const std::string &value)
+    bool Set(const std::string &key, const std::string &value, int ttl = 0)
     {
         CacheSetRequest request;
         request.set_key(key);
         request.set_value(value);
+        request.set_ttl(ttl);
 
         CacheSetResponse response;
         ClientContext context;
 
         Status status = stub_->Set(&context, request, &response);
+
+        if (status.ok())
+        {
+            return response.success();
+        }
+        else
+        {
+            std::cerr << "RPC failed." << std::endl;
+        }
+
+        return false;
+    }
+
+    bool SetTTL(const int32_t &ttl)
+    {
+        CacheSetTTLRequest request;
+        request.set_ttl(ttl);
+
+        CacheSetTTLResponse response;
+        ClientContext context;
+
+        Status status = stub_->SetTTL(&context, request, &response);
 
         if (status.ok())
         {
@@ -152,6 +177,8 @@ int main(int argc, char *argv[])
     std::string key = "example_key";
     std::string value = "example_value";
 
+    cache_client.SetTTL(1);
+
     // Put example
     if (db_client.Put(key, value))
     {
@@ -163,6 +190,28 @@ int main(int argc, char *argv[])
     }
 
     std::string result = cache_client.Get(key);
+    if (!result.empty())
+    {
+        std::cout << "Got value: " << result << std::endl;
+    }
+    else
+    {
+        std::cout << "Failed to get value or key not found." << std::endl;
+    }
+
+    result = cache_client.Get(key);
+    if (!result.empty())
+    {
+        std::cout << "Got value: " << result << std::endl;
+    }
+    else
+    {
+        std::cout << "Failed to get value or key not found." << std::endl;
+    }
+
+    sleep(2);
+
+    result = cache_client.Get(key);
     if (!result.empty())
     {
         std::cout << "Got value: " << result << std::endl;

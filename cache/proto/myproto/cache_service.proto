@@ -5,6 +5,15 @@ package freshCache;
 service CacheService {
     rpc Get(CacheGetRequest) returns (CacheGetResponse);
     rpc Set(CacheSetRequest) returns (CacheSetResponse);
+    rpc SetTTL(CacheSetTTLRequest) returns (CacheSetTTLResponse);
+}
+
+message CacheSetTTLRequest {
+    int32 ttl = 1;
+}
+
+message CacheSetTTLResponse {
+    bool success = 1;
 }
 
 message CacheGetRequest {
@@ -19,6 +28,7 @@ message CacheGetResponse {
 message CacheSetRequest {
     string key = 1;
     string value = 2;
+    int32 ttl = 3;
 } 
 
 message CacheSetResponse {

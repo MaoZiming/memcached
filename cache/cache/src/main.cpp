@@ -14,6 +14,8 @@ using freshCache::CacheGetResponse;
 using freshCache::CacheService;
 using freshCache::CacheSetRequest;
 using freshCache::CacheSetResponse;
+using freshCache::CacheSetTTLRequest;
+using freshCache::CacheSetTTLResponse;
 
 using freshCache::DBDeleteRequest;
 using freshCache::DBDeleteResponse;
@@ -104,6 +106,7 @@ public:
         value = memcached_get(memc, request->key().c_str(), request->key().size(), &value_length, &flags, &result);
         if (result == MEMCACHED_SUCCESS)
         {
+            std::cout << "Cache Hit!" << std::endl;
             response->set_value(std::string(value, value_length));
             response->set_success(true);
         }
@@ -117,7 +120,8 @@ public:
                 response->set_success(true);
 
                 // Optionally, cache the value for future requests
-                memcached_set(memc, request->key().c_str(), request->key().size(), db_value.c_str(), db_value.size(), (time_t)0, (uint32_t)0);
+                std::cout << "Cache: " << _ttl << std::endl;
+                memcached_set(memc, request->key().c_str(), request->key().size(), db_value.c_str(), db_value.size(), (time_t)_ttl, (uint32_t)0);
             }
             else
             {
@@ -137,8 +141,14 @@ public:
         memcached_return_t result;
 
         std::cout << "Set: " << request->key() << ", " << request->value()
-                  << std::endl;
-        result = memcached_set(memc, request->key().c_str(), request->key().size(), request->value().c_str(), request->value().size(), (time_t)0, (uint32_t)0);
+                  << ", TTL: " << request->ttl() << std::endl;
+
+        // Convert ttl to time_t. Using (time_t)request->ttl() is sufficient as it should be already in seconds.
+        time_t ttl = static_cast<time_t>(request->ttl());
+
+        result = memcached_set(memc, request->key().c_str(), request->key().size(),
+                               request->value().c_str(), request->value().size(),
+                               ttl, (uint32_t)0);
         if (result == MEMCACHED_SUCCESS)
         {
             response->set_success(true);
@@ -151,10 +161,25 @@ public:
         return grpc::Status::OK;
     }
 
+    grpc::Status SetTTL(grpc::ServerContext *context, const CacheSetTTLRequest *request, CacheSetTTLResponse *response) override
+    {
+        memcached_return_t result;
+
+        std::cout << "SetTTL: " << request->ttl() << std::endl;
+
+        _ttl = request->ttl();
+        response->set_success(true);
+
+        return grpc::Status::OK;
+    }
+
 private:
     memcached_st *memc;
     memcached_return rc;
     DBClient db_client_;
+    // We assume a uniform ttl for the entire cache.
+    // Default to no ttl requirement.
+    int32_t _ttl = 0;
 };
 
 void RunServer()
