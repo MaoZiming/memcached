@@ -50,9 +50,8 @@ public:
 
 #ifdef DEBUG
         std::cout << "Get: " << request->key() << std::endl;
-#endif
-
         std::cout << request->key() << std::endl;
+#endif
         value = memcached_get(memc, request->key().c_str(), request->key().size(), &value_length, &flags, &result);
         if (result == MEMCACHED_SUCCESS)
         {
