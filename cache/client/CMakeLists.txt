@@ -34,12 +34,14 @@ add_executable(
 add_executable(
     ttl_bench
     bench/ttl.cpp
+    bench/zipf.hpp
     ${SOURCES}
 )
 
 add_executable(
     adaptive_bench
     bench/adaptive.cpp
+    bench/zipf.hpp
     ${SOURCES}
 )
 

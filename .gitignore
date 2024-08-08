@@ -43,3 +43,4 @@ memcached-*.tar.gz.sha1
 .*.swp
 /compile_commands.json
 */build/*
+.vscode/

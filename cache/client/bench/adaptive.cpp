@@ -9,6 +9,7 @@
 
 #include "policy.hpp"
 #include "client.hpp"
+#include "zipf.hpp"
 
 // Function to generate Poisson distributed request intervals
 std::vector<std::chrono::milliseconds> generatePoissonIntervals(int num_requests, double lambda)
@@ -35,13 +36,14 @@ void _warm(Client &client, int num_keys, int ttl, int num_operations)
     }
 }
 
-void benchmark(Client &client, int num_keys, double lambda, int ttl, int num_operations)
+void benchmark(Client &client, int num_keys, double lambda, int ttl, int num_operations, double alpha)
 {
     client.SetTTL(ttl);
     auto intervals = generatePoissonIntervals(num_operations, lambda);
 
     _warm(client, num_keys, ttl, num_operations);
-
+    FastZipf zipf_gen(alpha, num_keys - 1); // 0-indexed: -1
+    std::vector<int> zipf_values = zipf_gen.generate_zipf(num_operations);
     std::vector<std::string> keys(num_keys);
     for (int i = 0; i < num_keys; ++i)
     {
@@ -52,12 +54,14 @@ void benchmark(Client &client, int num_keys, double lambda, int ttl, int num_ope
 
     for (int i = 0; i < num_operations; ++i)
     {
-        int key_index = std::rand() % num_keys;
+        // int key_index = std::rand() % num_keys;
+        int key_index = zipf_values[i];
+
         std::string key = keys[key_index];
         std::string value = "value" + std::to_string(key_index);
 
         bool do_set = false;
-        if (key_index % 2 == 0)
+        if (key_index % 2 == 1)
         {
             // Even key_index: 90% chance to read
             do_set = (std::rand() % 100) >= 90; // 10% chance to set
@@ -67,7 +71,9 @@ void benchmark(Client &client, int num_keys, double lambda, int ttl, int num_ope
             // Odd key_index: 10% chance to read
             do_set = (std::rand() % 100) < 90; // 90% chance to set
         }
-
+#ifdef DEBUG
+        std::cout << "key: " << key << ", do_set: " << do_set << std::endl;
+#endif
         if (do_set)
         {
             client.Set(key, value, ttl);
@@ -107,7 +113,8 @@ int main(int argc, char *argv[])
     int ttl = LONG_TTL;        // TTL in seconds
     int num_operations = 1000; // Number of operations to perform in the benchmark
 
-    benchmark(client, num_keys, lambda, ttl, num_operations);
+    double alpha = 1.3;
+    benchmark(client, num_keys, lambda, ttl, num_operations, alpha);
 
     return 0;
 }

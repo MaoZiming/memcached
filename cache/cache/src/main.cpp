@@ -58,7 +58,7 @@ public:
             cache_hits_++;
 
 #ifdef DEBUG
-            std::cout << "Cache Hit!" << std::endl;
+            std::cout << "key: " << request->key() << ", Cache Hit!" << std::endl;
 #endif
             response->set_value(std::string(value, value_length));
             response->set_success(true);
@@ -68,7 +68,7 @@ public:
             cache_miss_++;
 
 #ifdef DEBUG
-            std::cout << "Cache Miss!" << std::endl;
+            std::cout << "key: " << request->key() << ", Cache Miss!" << std::endl;
 #endif
             // Cache miss: fetch from the database
             std::string db_value = db_client_.Get(request->key());
