@@ -19,11 +19,15 @@ using freshCache::CacheGetMRRequest;
 using freshCache::CacheGetMRResponse;
 using freshCache::CacheGetRequest;
 using freshCache::CacheGetResponse;
+using freshCache::CacheInvalidateRequest;
+using freshCache::CacheInvalidateResponse;
 using freshCache::CacheService;
 using freshCache::CacheSetRequest;
 using freshCache::CacheSetResponse;
 using freshCache::CacheSetTTLRequest;
 using freshCache::CacheSetTTLResponse;
+using freshCache::CacheUpdateRequest;
+using freshCache::CacheUpdateResponse;
 
 using freshCache::DBDeleteRequest;
 using freshCache::DBDeleteResponse;
@@ -47,7 +51,7 @@ public:
     bool Delete(const std::string &key);
     void SetTracker(Tracker *tracker);
     std::string Get(const std::string &key);
-    float GetLoad(void);
+    int GetLoad(void);
 
 private:
     std::unique_ptr<DBService::Stub> stub_;
@@ -77,11 +81,13 @@ public:
     bool Set(const std::string &key, const std::string &value, int ttl = 0);
     void SetTTL(const int32_t &ttl);
     float GetMR(void);
-    float GetLoad(void);
+    int GetLoad(void);
 
 private:
     std::unique_ptr<DBClient> db_client_;
     std::unique_ptr<CacheClient> cache_client_;
 };
+
+const int LONG_TTL = 10000;
 
 #endif // CLIENT_HPP

@@ -27,10 +27,10 @@ set(HEADERS
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
 
 # Add the source files
-add_executable(MyMemcachedProject ${SOURCES} ${HEADERS})
+add_executable(server ${SOURCES} ${HEADERS})
 
 # Link the libmemcached library
-target_link_libraries(MyMemcachedProject
+target_link_libraries(server
     PRIVATE
     myproto
     /usr/local/lib/libmemcached.so

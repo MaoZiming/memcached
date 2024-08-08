@@ -4,8 +4,11 @@ Client::Client(std::shared_ptr<Channel> cache_channel, std::shared_ptr<Channel> 
     : cache_client_(std::make_unique<CacheClient>(cache_channel)),
       db_client_(std::make_unique<DBClient>(db_channel))
 {
-    cache_client_->SetTracker(tracker);
-    db_client_->SetTracker(tracker);
+    if (tracker != nullptr)
+    {
+        cache_client_->SetTracker(tracker);
+        db_client_->SetTracker(tracker);
+    }
 }
 
 std::string Client::Get(const std::string &key)
@@ -37,7 +40,7 @@ float Client::GetMR(void)
     return cache_client_->GetMR();
 }
 
-float Client::GetLoad(void)
+int Client::GetLoad(void)
 {
     return db_client_->GetLoad();
 }

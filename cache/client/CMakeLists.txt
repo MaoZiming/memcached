@@ -37,12 +37,23 @@ add_executable(
     ${SOURCES}
 )
 
+add_executable(
+    adaptive_bench
+    bench/adaptive.cpp
+    ${SOURCES}
+)
+
 target_link_libraries(client
     PRIVATE
     myproto
 )
 
 target_link_libraries(ttl_bench
+    PRIVATE
+    myproto
+)
+
+target_link_libraries(adaptive_bench
     PRIVATE
     myproto
 )

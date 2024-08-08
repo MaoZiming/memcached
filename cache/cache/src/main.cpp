@@ -77,11 +77,15 @@ public:
                 response->set_value(db_value);
                 response->set_success(true);
 
-                // Optionally, cache the value for future requests
+// Optionally, cache the value for future requests
 #ifdef DEBUG
                 std::cout << "Cache: " << ttl_ << std::endl;
 #endif
                 memcached_set(memc, request->key().c_str(), request->key().size(), db_value.c_str(), db_value.size(), (time_t)ttl_, (uint32_t)0);
+#ifdef DEBUG
+                memcached_get(memc, request->key().c_str(), request->key().size(), &value_length, &flags, &result);
+                assert(result == MEMCACHED_SUCCESS);
+#endif
             }
             else
             {
@@ -100,10 +104,10 @@ public:
     {
         memcached_return_t result;
 
-#ifdef DEBUG
+        // #ifdef DEBUG
         std::cout << "Set: " << request->key() << ", " << request->value()
                   << ", TTL: " << request->ttl() << std::endl;
-#endif
+        // #endif
 
         // Convert ttl to time_t. Using (time_t)request->ttl() is sufficient as it should be already in seconds.
         time_t ttl = static_cast<time_t>(request->ttl());
@@ -150,6 +154,46 @@ public:
         else
             response->set_mr(-1);
 
+        return grpc::Status::OK;
+    }
+
+    grpc::Status Invalidate(grpc::ServerContext *context, const CacheInvalidateRequest *request, CacheInvalidateResponse *response) override
+    {
+        memcached_return_t result;
+#ifdef DEBUG
+        std::cout << "Invalidate: " << request->key() << std::endl;
+#endif
+        result = memcached_delete(memc, request->key().c_str(), request->key().size(),
+                                  (time_t)0);
+        if (result == MEMCACHED_SUCCESS)
+        {
+            response->set_success(true);
+        }
+        else
+        {
+            response->set_success(false);
+        }
+        return grpc::Status::OK;
+    }
+
+    grpc::Status Update(grpc::ServerContext *context, const CacheUpdateRequest *request, CacheUpdateResponse *response) override
+    {
+        memcached_return_t result;
+#ifdef DEBUG
+        std::cout << "Update: " << request->key() << ", " << request->value()
+                  << std::endl;
+#endif
+        result = memcached_replace(memc, request->key().c_str(), request->key().size(),
+                                   request->value().c_str(), request->value().size(),
+                                   (time_t)0, (uint32_t)0);
+        if (result == MEMCACHED_SUCCESS)
+        {
+            response->set_success(true);
+        }
+        else
+        {
+            response->set_success(false);
+        }
         return grpc::Status::OK;
     }
 

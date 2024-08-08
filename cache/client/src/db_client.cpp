@@ -40,6 +40,14 @@ bool DBClient::Put(const std::string &key, const std::string &value)
     request.set_key(key);
     request.set_value(value);
 
+    if (tracker_)
+    {
+        float ew = tracker_->get(key);
+        request.set_ew(ew);
+    }
+    else
+        request.set_ew(0);
+
     DBPutResponse response;
     ClientContext context;
 
@@ -88,7 +96,7 @@ void DBClient::SetTracker(Tracker *tracker)
     tracker_ = tracker;
 }
 
-float DBClient::GetLoad(void)
+int DBClient::GetLoad(void)
 {
     DBGetLoadRequest request;
     DBGetLoadResponse response;

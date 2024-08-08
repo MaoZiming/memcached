@@ -12,6 +12,7 @@ service DBService {
 message DBPutRequest {
   string key = 1;
   string value = 2;
+  float ew = 3;
 }
 
 message DBPutResponse {
@@ -40,6 +41,6 @@ message DBGetLoadRequest {
 }
 
 message DBGetLoadResponse {
-  float load = 1;
+  int32 load = 1;
   bool success = 2;
 }

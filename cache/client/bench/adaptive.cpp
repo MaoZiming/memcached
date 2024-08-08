@@ -67,6 +67,7 @@ void benchmark(Client &client, int num_keys, double lambda, int ttl, int num_ope
             // Odd key_index: 10% chance to read
             do_set = (std::rand() % 100) < 90; // 90% chance to set
         }
+
         if (do_set)
         {
             client.Set(key, value, ttl);
@@ -84,7 +85,7 @@ void benchmark(Client &client, int num_keys, double lambda, int ttl, int num_ope
     auto end_time = std::chrono::high_resolution_clock::now();
 
     float mr = client.GetMR();
-    float load = client.GetLoad();
+    int load = client.GetLoad();
 
     std::cout << "Benchmark Results:" << std::endl;
     std::cout << "Miss Ratio (MR): " << mr << std::endl;
@@ -93,16 +94,17 @@ void benchmark(Client &client, int num_keys, double lambda, int ttl, int num_ope
 
 int main(int argc, char *argv[])
 {
+    Tracker tracker;
     // Create a channel to connect to the server
     Client client(grpc::CreateChannel("10.128.0.34:50051",
                                       grpc::InsecureChannelCredentials()),
                   grpc::CreateChannel("10.128.0.33:50051",
                                       grpc::InsecureChannelCredentials()),
-                  nullptr);
+                  &tracker);
 
     int num_keys = 20;         // Number of keys
     double lambda = 5.0;       // Poisson distribution parameter (average request rate)
-    int ttl = 1;               // TTL in seconds
+    int ttl = LONG_TTL;        // TTL in seconds
     int num_operations = 1000; // Number of operations to perform in the benchmark
 
     benchmark(client, num_keys, lambda, ttl, num_operations);
