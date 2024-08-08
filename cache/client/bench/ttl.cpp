@@ -10,6 +10,7 @@
 #include "policy.hpp"
 #include "client.hpp"
 #include "zipf.hpp"
+#include "tqdm.hpp"
 
 // Function to generate Poisson distributed request intervals
 std::vector<std::chrono::milliseconds> generatePoissonIntervals(int num_requests, double lambda)
@@ -52,7 +53,7 @@ void benchmark(Client &client, int num_keys, double lambda, int ttl, int num_ope
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    for (int i = 0; i < num_operations; ++i)
+    for (int i : tq::trange(num_operations))
     {
         // int key_index = std::rand() % num_keys;
         int key_index = zipf_values[i];

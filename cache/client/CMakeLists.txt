@@ -13,10 +13,12 @@ set(SOURCES
     src/db_client.cpp
     src/client.cpp
     src/client.hpp
+    include/tqdm.hpp
 )
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/client/src
+    ${CMAKE_SOURCE_DIR}/client/include
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
