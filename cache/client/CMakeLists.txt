@@ -14,6 +14,8 @@ set(SOURCES
     src/client.cpp
     src/client.hpp
     include/tqdm.hpp
+    include/zipf.hpp
+    include/benchmark.hpp
 )
 
 include_directories(
@@ -36,14 +38,24 @@ add_executable(
 add_executable(
     ttl_bench
     bench/ttl.cpp
-    bench/zipf.hpp
+    ${SOURCES}
+)
+
+add_executable(
+    invalidate_bench
+    bench/invalidate.cpp
+    ${SOURCES}
+)
+
+add_executable(
+    update_bench
+    bench/update.cpp
     ${SOURCES}
 )
 
 add_executable(
     adaptive_bench
     bench/adaptive.cpp
-    bench/zipf.hpp
     ${SOURCES}
 )
 
@@ -53,6 +65,16 @@ target_link_libraries(client
 )
 
 target_link_libraries(ttl_bench
+    PRIVATE
+    myproto
+)
+
+target_link_libraries(invalidate_bench
+    PRIVATE
+    myproto
+)
+
+target_link_libraries(update_bench
     PRIVATE
     myproto
 )

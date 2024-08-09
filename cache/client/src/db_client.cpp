@@ -34,7 +34,7 @@ std::string DBClient::Get(const std::string &key)
     return "";
 }
 
-bool DBClient::Put(const std::string &key, const std::string &value)
+bool DBClient::Put(const std::string &key, const std::string &value, float ew)
 {
     DBPutRequest request;
     request.set_key(key);
@@ -42,11 +42,15 @@ bool DBClient::Put(const std::string &key, const std::string &value)
 
     if (tracker_)
     {
-        float ew = tracker_->get(key);
+        assert(ew == ADAPTIVE_EW);
+        ew = tracker_->get(key);
         request.set_ew(ew);
     }
     else
-        request.set_ew(0);
+    {
+        assert(ew != ADAPTIVE_EW);
+        request.set_ew(ew);
+    }
 
     DBPutResponse response;
     ClientContext context;

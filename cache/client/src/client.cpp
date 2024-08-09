@@ -16,10 +16,10 @@ std::string Client::Get(const std::string &key)
     return cache_client_->Get(key);
 }
 
-bool Client::Set(const std::string &key, const std::string &value, int ttl)
+bool Client::Set(const std::string &key, const std::string &value, int ttl, float ew)
 {
     // Call Put method on DBClient to store data
-    bool db_result = db_client_->Put(key, value);
+    bool db_result = db_client_->Put(key, value, ew);
 
     // Optionally handle the result if necessary
     if (!db_result)

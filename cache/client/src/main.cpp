@@ -18,11 +18,11 @@ int main(int argc, char *argv[])
     // Example usage of Set and Get
     std::string key = "example_key3";
     std::string value = "example_value2";
-
-    client.SetTTL(1);
+    const int TTL = 1;
+    client.SetTTL(TTL);
 
     // Put example
-    if (!client.Set(key, value))
+    if (!client.Set(key, value, TTL, TTL_EW))
     {
         std::cout << "Failed to put key-value pair." << std::endl;
     }

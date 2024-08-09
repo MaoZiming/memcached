@@ -47,7 +47,7 @@ class DBClient
 {
 public:
     explicit DBClient(std::shared_ptr<Channel> channel);
-    bool Put(const std::string &key, const std::string &value);
+    bool Put(const std::string &key, const std::string &value, float ew);
     bool Delete(const std::string &key);
     void SetTracker(Tracker *tracker);
     std::string Get(const std::string &key);
@@ -78,7 +78,7 @@ class Client
 public:
     explicit Client(std::shared_ptr<Channel> cache_channel, std::shared_ptr<Channel> db_channel, Tracker *tracker);
     std::string Get(const std::string &key);
-    bool Set(const std::string &key, const std::string &value, int ttl = 0);
+    bool Set(const std::string &key, const std::string &value, int ttl, float ew);
     void SetTTL(const int32_t &ttl);
     float GetMR(void);
     int GetLoad(void);
@@ -89,5 +89,10 @@ private:
 };
 
 const int LONG_TTL = 10000;
+
+const int ADAPTIVE_EW = 0;
+const int TTL_EW = -2;
+const int INVALIDATE_EW = -3;
+const int UPDATE_EW = -4;
 
 #endif // CLIENT_HPP

@@ -15,20 +15,19 @@
 
 int main(int argc, char *argv[])
 {
-    Tracker tracker;
     // Create a channel to connect to the server
     Client client(grpc::CreateChannel(CACHE_ADDR,
                                       grpc::InsecureChannelCredentials()),
                   grpc::CreateChannel(DB_ADDR,
                                       grpc::InsecureChannelCredentials()),
-                  &tracker);
+                  nullptr);
 
     int num_keys = 20;         // Number of keys
     double lambda = 5.0;       // Poisson distribution parameter (average request rate)
     int ttl = LONG_TTL;        // TTL in seconds
     int num_operations = 1000; // Number of operations to perform in the benchmark
     double alpha = 1.3;
-    float ew = ADAPTIVE_EW;
+    float ew = UPDATE_EW;
     benchmark(client, num_keys, lambda, ttl, num_operations, alpha, ew);
 
     return 0;
