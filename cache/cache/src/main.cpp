@@ -89,6 +89,7 @@ public:
             }
             else
             {
+                std::cerr << "DB Key not found." << std::endl;
                 response->set_success(false);
             }
         }

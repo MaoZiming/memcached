@@ -28,7 +28,7 @@ std::string CacheClient::Get(const std::string &key)
         }
         else
         {
-            std::cerr << "Key not found." << std::endl;
+            std::cerr << "Cache Key not found: " << key << std::endl;
         }
     }
     else

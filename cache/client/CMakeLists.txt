@@ -16,6 +16,7 @@ set(SOURCES
     include/tqdm.hpp
     include/zipf.hpp
     include/benchmark.hpp
+    include/workload.hpp
 )
 
 include_directories(

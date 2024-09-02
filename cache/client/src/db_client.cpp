@@ -23,7 +23,7 @@ std::string DBClient::Get(const std::string &key)
         }
         else
         {
-            std::cerr << "Key not found." << std::endl;
+            std::cerr << "DB Key not found." << std::endl;
         }
     }
     else

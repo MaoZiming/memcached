@@ -15,6 +15,14 @@
 
 int main(int argc, char *argv[])
 {
+    if (argc < 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " <workload>" << std::endl;
+        return 1;
+    }
+
+    std::string workload = argv[1]; // Capture workload string from the command line
+
     Tracker tracker;
     // Create a channel to connect to the server
     Client client(grpc::CreateChannel(CACHE_ADDR,
@@ -29,7 +37,9 @@ int main(int argc, char *argv[])
     int num_operations = 1000; // Number of operations to perform in the benchmark
     double alpha = 1.3;
     float ew = ADAPTIVE_EW;
-    benchmark(client, num_keys, lambda, ttl, num_operations, alpha, ew);
+
+    // Pass the workload string to the benchmark function
+    benchmark(client, num_keys, lambda, ttl, num_operations, alpha, ew, workload);
 
     return 0;
 }
