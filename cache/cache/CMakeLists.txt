@@ -34,4 +34,5 @@ target_link_libraries(server
     PRIVATE
     myproto
     /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
 )

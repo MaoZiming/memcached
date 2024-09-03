@@ -24,13 +24,13 @@ message CacheGetRequest {
 }
 
 message CacheGetResponse {
-    string value = 1;
+    bytes value = 1;
     bool success = 2;
 }
 
 message CacheSetRequest {
     string key = 1;
-    string value = 2;
+    bytes value = 2;
     int32 ttl = 3;
 } 
 
@@ -56,7 +56,7 @@ message CacheInvalidateResponse {
 
 message CacheUpdateRequest {
     string key = 1;
-    string value = 2;
+    bytes value = 2;
 }
 
 message CacheUpdateResponse {

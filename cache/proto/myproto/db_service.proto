@@ -11,7 +11,7 @@ service DBService {
 
 message DBPutRequest {
   string key = 1;
-  string value = 2;
+  bytes value = 2;
   float ew = 3;
 }
 
@@ -24,7 +24,7 @@ message DBGetRequest {
 }
 
 message DBGetResponse {
-  string value = 1;
+  bytes value = 1;
   bool found = 2;
 }
 

@@ -13,6 +13,9 @@
 #include "zipf.hpp"
 #include "tqdm.hpp"
 
+const int KB = 1000;
+const int MB = 1000 * KB;
+
 struct request
 {
     std::chrono::milliseconds interval;
@@ -63,7 +66,7 @@ private:
     {
         std::default_random_engine generator(std::chrono::system_clock::now().time_since_epoch().count());
         std::exponential_distribution<double> distribution(lambda);
-        FastZipf zipf_gen(alpha, num_requests - 1); // 0-indexed: -1
+        FastZipf zipf_gen(alpha, num_keys - 1); // 0-indexed: -1
         std::vector<int> zipf_values = zipf_gen.generate_zipf(num_requests);
         std::vector<std::string> keys(num_keys);
         for (int i = 0; i < num_keys; ++i)
@@ -75,11 +78,13 @@ private:
         {
             int key_index = zipf_values[i];
             std::string key = keys[key_index];
-            std::string value = "value" + std::to_string(key_index);
+            std::string value = "value" + std::to_string(key_index) + std::string(1 * MB, 'a');
 
             request r;
-            r.interval = std::chrono::milliseconds(static_cast<int>(distribution(generator) * 1000));
-            if (key_index % 2 == 0)
+            int interval_in_ms = static_cast<int>(distribution(generator) * 1000);
+            // std::cout << "lambda: " << lambda << ", Intervals in ms: " << interval_in_ms << std::endl;
+            r.interval = std::chrono::milliseconds(interval_in_ms);
+            if (key_index % 3 < 2)
             {
                 // Even key_index: 90% chance to read
                 r.is_write = (std::rand() % 100) >= 90; // 10% chance to set
@@ -149,7 +154,7 @@ private:
 
             // Create the value by repeating '1' size times
             // std::string key(key_size, '1');
-            std::string value(val_size, '1');
+            std::string value(val_size, 'a');
 
             // Add request to the list
             intervals_.push_back({interval, is_write, key, value});

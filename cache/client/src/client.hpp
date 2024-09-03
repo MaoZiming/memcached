@@ -82,6 +82,7 @@ public:
     void SetTTL(const int32_t &ttl);
     float GetMR(void);
     int GetLoad(void);
+    bool SetCache(const std::string &key, const std::string &value, int ttl);
 
 private:
     std::unique_ptr<DBClient> db_client_;

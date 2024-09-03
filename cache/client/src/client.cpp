@@ -44,3 +44,8 @@ int Client::GetLoad(void)
 {
     return db_client_->GetLoad();
 }
+
+bool Client::SetCache(const std::string &key, const std::string &value, int ttl)
+{
+    return cache_client_->Set(key, value, ttl);
+}

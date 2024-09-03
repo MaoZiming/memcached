@@ -31,15 +31,11 @@ int main(int argc, char *argv[])
                                       grpc::InsecureChannelCredentials()),
                   &tracker);
 
-    int num_keys = 20;         // Number of keys
-    double lambda = 5.0;       // Poisson distribution parameter (average request rate)
-    int ttl = LONG_TTL;        // TTL in seconds
-    int num_operations = 1000; // Number of operations to perform in the benchmark
-    double alpha = 1.3;
     float ew = ADAPTIVE_EW;
+    int ttl = LONG_TTL;
 
     // Pass the workload string to the benchmark function
-    benchmark(client, num_keys, lambda, ttl, num_operations, alpha, ew, workload);
+    benchmark(client, num_keys, lambda, ttl, num_operations, alpha, ew, workload, NUM_CPUS);
 
     return 0;
 }
