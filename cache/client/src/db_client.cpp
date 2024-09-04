@@ -73,6 +73,34 @@ bool DBClient::Put(const std::string &key, const std::string &value, float ew)
     return false;
 }
 
+bool DBClient::PutWarm(const std::string &key, const std::string &value)
+{
+    DBPutRequest request;
+    request.set_key(key);
+    request.set_value(value);
+    request.set_ew(TTL_EW);
+
+    DBPutResponse response;
+    ClientContext context;
+
+    Status status = stub_->Put(&context, request, &response);
+    if (tracker_)
+    {
+        tracker_->write(key);
+    }
+
+    if (status.ok())
+    {
+        return response.success();
+    }
+    else
+    {
+        std::cerr << "RPC failed." << std::endl;
+    }
+
+    return false;
+}
+
 bool DBClient::Delete(const std::string &key)
 {
     DBDeleteRequest request;

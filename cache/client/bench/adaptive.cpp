@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
 
     float ew = ADAPTIVE_EW;
     int ttl = LONG_TTL;
+    alpha = 1.0;
 
     // Pass the workload string to the benchmark function
     benchmark(client, num_keys, lambda, ttl, num_operations, alpha, ew, workload, NUM_CPUS);

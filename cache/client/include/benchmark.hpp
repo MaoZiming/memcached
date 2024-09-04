@@ -25,16 +25,50 @@ double alpha = 1.3;
 
 void _warm_thread(Client &client, int start, int end, int ttl, float ew, std::unique_ptr<Workload> &workload)
 {
-    for (int i = start; i < end; ++i)
+
+    int idx = 0;
+
+    for (const auto &[key, value] : workload->keys_to_val)
     {
-        std::string key = workload->get_key(i);
-        std::string value = workload->get_value(i);
+        if (idx < start || idx > end)
+        {
+            idx += 1;
+            continue;
+        }
+        idx += 1;
+        // std::string key = workload->get_key(i);
+        // std::string value = workload->get_value(i);
 
 #ifdef DEBUG
         std::cout << workload->get_key(i).size() << ", " << workload->get_value(i).size() << ", " << workload->get_is_write(i) << "," << workload->get_interval(i).count() << std::endl;
 #endif
-        client.Set(key, value, ttl, ew);
+        std::cout << "Warm: " << key << ", " << idx - start << "/" << end - start << std::endl;
+        client.SetWarm(key, value, ttl); // Disable invalidate
         client.SetCache(key, value, ttl);
+    }
+}
+
+void _read_warm_thread(Client &client, int start, int end, int ttl, float ew, std::unique_ptr<Workload> &workload)
+{
+    int idx = 0;
+
+    for (const auto &[key, value] : workload->keys_to_val)
+    {
+        if (idx < start || idx > end)
+        {
+            idx += 1;
+            continue;
+        }
+        idx += 1;
+        // std::string key = workload->get_key(i);
+        // std::string value = workload->get_value(i);
+
+#ifdef DEBUG
+        std::cout
+            << workload->get_key(i).size() << ", " << workload->get_value(i).size() << ", " << workload->get_is_write(i) << "," << workload->get_interval(i).count() << std::endl;
+#endif
+        std::cout << "Read Warm: " << key << ", " << idx - start << "/" << end - start << std::endl;
+        client.GetWarmDB(key); // Disable invalidate
     }
 }
 
@@ -43,16 +77,31 @@ void _warm(Client &client, int num_keys, int ttl, int num_operations, float ew, 
     std::cout << "Start warming: " << num_operations << std::endl;
 
     int num_threads = NUM_CPUS;
-    int operations_per_thread = num_operations / num_threads;
+    int operations_per_thread = workload->keys_to_val.size() / num_threads;
 
     std::vector<std::thread> threads;
 
     for (int t = 0; t < num_threads; ++t)
     {
         int start = t * operations_per_thread;
-        int end = (t == num_threads - 1) ? num_operations : start + operations_per_thread;
+        int end = (t == num_threads - 1) ? workload->keys_to_val.size() : start + operations_per_thread;
 
         threads.emplace_back(_warm_thread, std::ref(client), start, end, ttl, ew, std::ref(workload));
+    }
+
+    // Join all threads
+    for (auto &thread : threads)
+    {
+        thread.join();
+    }
+
+    threads.clear();
+    for (int t = 0; t < num_threads; ++t)
+    {
+        int start = t * operations_per_thread;
+        int end = (t == num_threads - 1) ? workload->keys_to_val.size() : start + operations_per_thread;
+
+        threads.emplace_back(_read_warm_thread, std::ref(client), start, end, ttl, ew, std::ref(workload));
     }
 
     // Join all threads
@@ -78,7 +127,7 @@ void benchmark_thread(Client &client, int start_op, int end_op, int num_keys, in
         }
         else
         {
-            std::cout << "Read: " << key << std::endl;
+            // std::cout << "Read: " << key << std::endl;
             std::string result = client.Get(key);
         }
 

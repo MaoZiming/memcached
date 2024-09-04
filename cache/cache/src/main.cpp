@@ -100,7 +100,6 @@ public:
         if (result == MEMCACHED_SUCCESS)
         {
             cache_hits_++;
-
 #ifdef DEBUG
             std::cout << "key: " << request->key() << ", Cache Hit!" << std::endl;
 #endif
@@ -110,12 +109,15 @@ public:
         else
         {
             cache_miss_++;
-
 #ifdef DEBUG
             std::cout << "key: " << request->key() << ", Cache Miss!" << std::endl;
 #endif
             // Cache miss: fetch from the database
+
+#ifndef CLIENT_DRIVEN_FILL
+            std::cout << "Miss Key: " << request->key() << std::endl;
             std::string db_value = db_client_.Get(request->key());
+            std::cout << "Miss key finished: " << request->key() << std::endl;
             if (!db_value.empty())
             {
                 response->set_value(db_value);
@@ -163,7 +165,8 @@ public:
 
                 if (set_result == MEMCACHED_BUFFERED || set_result == MEMCACHED_DELETED || set_result == MEMCACHED_END || set_result == MEMCACHED_ITEM || set_result == MEMCACHED_STAT || set_result == MEMCACHED_STORED || set_result == MEMCACHED_SUCCESS || set_result == MEMCACHED_VALUE)
                 {
-                    std::cerr << "Success: " << memcached_strerror(memc, set_result) << ", TTL: " << ttl_ << ", key: " << request->key() << ", value length: " << db_value.length() << ", key length: " << request->key().length() << std::endl;
+                    // std::cerr << "Success: " << memcached_strerror(memc, set_result) << ", TTL: " << ttl_ << ", key: " << request->key() << ", value length: " << db_value.length() << ", key length: " << request->key().length() << std::endl;
+                    ;
                 }
                 else
                 {
@@ -196,6 +199,11 @@ public:
                 std::cerr << "DB Key not found." << std::endl;
                 response->set_success(false);
             }
+#else
+            // Let client fetches the value from the DB.
+            response->set_value("");
+            response->set_success(false);
+#endif
         }
 
         // if (value)
@@ -268,9 +276,10 @@ public:
     grpc::Status Invalidate(grpc::ServerContext *context, const CacheInvalidateRequest *request, CacheInvalidateResponse *response) override
     {
         memcached_return_t result;
-#ifdef DEBUG
+        // #ifdef DEBUG
         std::cout << "Invalidate: " << request->key() << std::endl;
-#endif
+        // #endif
+
         memcached_st *memc = create_mc();
         result = memcached_delete(memc, request->key().c_str(), request->key().size(),
                                   (time_t)0);

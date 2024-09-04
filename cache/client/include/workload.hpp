@@ -49,6 +49,8 @@ public:
         return intervals_[i].interval;
     }
 
+    std::unordered_map<std::string, std::string> keys_to_val;
+
 protected:
     std::vector<request> intervals_;
 };
@@ -66,9 +68,23 @@ private:
     {
         std::default_random_engine generator(std::chrono::system_clock::now().time_since_epoch().count());
         std::exponential_distribution<double> distribution(lambda);
-        FastZipf zipf_gen(alpha, num_keys - 1); // 0-indexed: -1
-        std::vector<int> zipf_values = zipf_gen.generate_zipf(num_requests);
         std::vector<std::string> keys(num_keys);
+        std::vector<int> distribution_values;
+        if (alpha > 1.0)
+        {
+            FastZipf zipf_gen(alpha, num_keys - 1); // 0-indexed: -1
+            distribution_values = zipf_gen.generate_zipf(num_requests);
+        }
+        else
+        {
+            std::uniform_int_distribution<int> uniform_dist(0, num_keys - 1); // 0-indexed: -1
+            distribution_values.reserve(num_requests);
+            for (int i = 0; i < num_requests; ++i)
+            {
+                distribution_values[i] = uniform_dist(generator);
+            }
+        }
+
         for (int i = 0; i < num_keys; ++i)
         {
             keys[i] = "key" + std::to_string(i);
@@ -76,7 +92,7 @@ private:
 
         for (int i = 0; i < num_requests; ++i)
         {
-            int key_index = zipf_values[i];
+            int key_index = distribution_values[i];
             std::string key = keys[key_index];
             std::string value = "value" + std::to_string(key_index) + std::string(1 * MB, 'a');
 
@@ -84,7 +100,9 @@ private:
             int interval_in_ms = static_cast<int>(distribution(generator) * 1000);
             // std::cout << "lambda: " << lambda << ", Intervals in ms: " << interval_in_ms << std::endl;
             r.interval = std::chrono::milliseconds(interval_in_ms);
-            if (key_index % 3 < 2)
+
+            /*
+            if (key_index % 2 == 0)
             {
                 // Even key_index: 90% chance to read
                 r.is_write = (std::rand() % 100) >= 90; // 10% chance to set
@@ -94,10 +112,13 @@ private:
                 // Odd key_index: 10% chance to read
                 r.is_write = (std::rand() % 100) < 90; // 90% chance to set
             }
+            */
+            r.is_write = (std::rand() % 100) >= 99;
             r.key = key;
             r.value = value;
 
             intervals_.push_back(r);
+            keys_to_val[key] = value;
         }
     }
 };
@@ -156,6 +177,7 @@ private:
             // std::string key(key_size, '1');
             std::string value(val_size, 'a');
 
+            keys_to_val[key] = value;
             // Add request to the list
             intervals_.push_back({interval, is_write, key, value});
         }

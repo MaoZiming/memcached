@@ -3,7 +3,9 @@
 // Implementation of CacheClient methods
 
 CacheClient::CacheClient(std::shared_ptr<Channel> channel)
-    : stub_(CacheService::NewStub(channel)) {}
+    : stub_(CacheService::NewStub(channel))
+{
+}
 
 std::string CacheClient::Get(const std::string &key)
 {
@@ -28,7 +30,12 @@ std::string CacheClient::Get(const std::string &key)
         }
         else
         {
+#ifndef CLIENT_DRIVEN_FILL
             std::cerr << "Cache Key not found: " << key << std::endl;
+#else
+            // Let client talks to DB.
+            return "";
+#endif
         }
     }
     else

@@ -22,6 +22,7 @@ set(SOURCES
 include_directories(
     ${CMAKE_SOURCE_DIR}/client/src
     ${CMAKE_SOURCE_DIR}/client/include
+    /usr/local/include/libmemcached
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
@@ -63,24 +64,34 @@ add_executable(
 target_link_libraries(client
     PRIVATE
     myproto
+    /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
 )
 
 target_link_libraries(ttl_bench
     PRIVATE
     myproto
+    /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
 )
 
 target_link_libraries(invalidate_bench
     PRIVATE
     myproto
+    /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
 )
 
 target_link_libraries(update_bench
     PRIVATE
     myproto
+    /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
 )
 
 target_link_libraries(adaptive_bench
     PRIVATE
     myproto
+    /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
 )
