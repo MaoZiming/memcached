@@ -44,3 +44,6 @@ memcached-*.tar.gz.sha1
 /compile_commands.json
 */build/*
 .vscode/
+cache/dataset
+cache/bench/*log
+cache/key

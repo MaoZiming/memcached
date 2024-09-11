@@ -50,7 +50,7 @@ public:
         memcached_st *memc = memcached_pool_pop(pool, true, &rc);
         if (rc != MEMCACHED_SUCCESS)
         {
-            std::cerr << rc << std::endl;
+            printf("Error: %s\n", memcached_strerror(memc, rc));
         }
         assert(rc == MEMCACHED_SUCCESS);
         assert(memc != nullptr);
@@ -276,9 +276,9 @@ public:
     grpc::Status Invalidate(grpc::ServerContext *context, const CacheInvalidateRequest *request, CacheInvalidateResponse *response) override
     {
         memcached_return_t result;
-        // #ifdef DEBUG
+#ifdef DEBUG
         std::cout << "Invalidate: " << request->key() << std::endl;
-        // #endif
+#endif
 
         memcached_st *memc = create_mc();
         result = memcached_delete(memc, request->key().c_str(), request->key().size(),
@@ -301,7 +301,7 @@ public:
         memcached_st *memc = create_mc();
 
 #ifdef DEBUG
-        std::cout << "Update: " << request->key() << ", " << request->value()
+        std::cout << "Update: " << request->key()
                   << std::endl;
 #endif
         result = memcached_replace(memc, request->key().c_str(), request->key().size(),

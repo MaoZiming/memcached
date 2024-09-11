@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
                                       grpc::InsecureChannelCredentials()),
                   nullptr);
 
-    float ew = INVALIDATE_EW;
+    float ew = TTL_EW;
     int ttl = LONG_TTL;
     // alpha = 1.0;
 

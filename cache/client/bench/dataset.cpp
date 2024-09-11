@@ -31,12 +31,12 @@ int main(int argc, char *argv[])
                                       grpc::InsecureChannelCredentials()),
                   nullptr);
 
-    float ew = INVALIDATE_EW;
+    float ew = TTL_EW;
     int ttl = LONG_TTL;
     // alpha = 1.0;
 
     // Pass the workload string to the benchmark function
-    benchmark(client, ttl, ew, workload, NUM_CPUS);
+    benchmark(client, ttl, ew, workload, NUM_CPUS, true);
 
     return 0;
 }

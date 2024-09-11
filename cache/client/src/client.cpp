@@ -48,7 +48,9 @@ std::string Client::Get(const std::string &key)
 #ifdef CLIENT_DRIVEN_FILL
     if (value == "")
     {
-        std::cout << "GetWarmDB: " << key << std::endl;
+#ifdef DEBUG
+        std::cout << "Miss: " << key << std::endl;
+#endif
         value = GetWarmDB(key);
         assert(value != "");
         SetCache(key, value, ttl_);
@@ -92,6 +94,7 @@ bool Client::SetWarm(const std::string &key, const std::string &value, int ttl)
 void Client::SetTTL(const int32_t &ttl)
 {
     ttl_ = ttl;
+
     cache_client_->SetTTL(ttl);
 }
 
@@ -107,7 +110,30 @@ int Client::GetLoad(void)
 
 bool Client::SetCache(const std::string &key, const std::string &value, int ttl)
 {
+
+#ifdef GET_LOCAL_CACHE
+    // Get the value associated with the key from Memcached
+    memcached_st *memc = create_mc();
+
+    memcached_return_t set_result;
+    set_result = memcached_set(memc, key.c_str(), key.size(), value.c_str(), value.size(), (time_t)ttl_, (uint32_t)0);
+
+    free_mc(memc);
+    if (set_result == MEMCACHED_SUCCESS)
+    {
+        return true;
+        // free(value);
+    }
+    else
+    {
+        std::cerr << "Cache set failed: " << key << std::endl;
+        return false;
+    }
+
+#else
+
     return cache_client_->Set(key, value, ttl);
+#endif
 }
 
 std::string Client::GetLocalCache(const std::string &key)

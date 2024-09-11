@@ -61,6 +61,18 @@ add_executable(
     ${SOURCES}
 )
 
+add_executable(
+    stale_bench
+    bench/stale.cpp
+    ${SOURCES}
+)
+
+add_executable(
+    dataset
+    bench/dataset.cpp
+    ${SOURCES}
+)
+
 target_link_libraries(client
     PRIVATE
     myproto
@@ -90,6 +102,21 @@ target_link_libraries(update_bench
 )
 
 target_link_libraries(adaptive_bench
+    PRIVATE
+    myproto
+    /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
+)
+
+target_link_libraries(stale_bench
+    PRIVATE
+    myproto
+    /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
+)
+
+
+target_link_libraries(dataset
     PRIVATE
     myproto
     /usr/local/lib/libmemcached.so
