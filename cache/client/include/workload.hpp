@@ -41,26 +41,42 @@ public:
 
     std::string get_key(int i) const
     {
+#ifdef DEBUG
+        assert(i < intervals_.size());
+#endif
         return intervals_[i].key;
     }
 
     std::string get_value_from_size(int value_size)
     {
+#ifdef DEBUG
+        assert(value_size > 0);
+#endif
         return std::string(value_size, 'a');
     }
 
     std::string get_value(int i) const
     {
+#ifdef DEBUG
+        assert(i < intervals_.size());
+        assert(intervals_[i].value_size > 0);
+#endif
         return std::string(intervals_[i].value_size, 'a');
     }
 
     bool get_is_write(int i) const
     {
+#ifdef DEBUG
+        assert(i < intervals_.size());
+#endif
         return intervals_[i].is_write;
     }
 
     std::chrono::milliseconds get_interval(int i) const
     {
+#ifdef DEBUG
+        assert(i < intervals_.size());
+#endif
         return intervals_[i].interval;
     }
 
@@ -131,7 +147,7 @@ public:
         if (intervals_.empty())
             return 0.0;
 
-        int total_size = 0;
+        int64_t total_size = 0;
         for (const auto &r : intervals_)
         {
             total_size += r.value_size;
@@ -510,7 +526,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Twitter/2020Mar";
-    int num_operations_ = 5000000;
+    int num_operations_ = 3000000;
 };
 
 class IBMWorkload : public Workload
@@ -693,6 +709,8 @@ private:
 
             std::getline(ss, token, ','); // timestamp
             timestamp = std::stoull(token);
+            // Timestamp of this operation received by server, in microseconds
+            op_time = std::chrono::milliseconds(timestamp / 1000); // Convert to milliseconds
 
             // Set the request details
             r.key = std::to_string(device_id) + "_" + std::to_string(offset);

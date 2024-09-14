@@ -52,7 +52,12 @@ std::string Client::Get(const std::string &key)
         std::cout << "Miss: " << key << std::endl;
 #endif
         value = GetWarmDB(key);
-        assert(value != "");
+        // assert(value != "");
+        if (value == "")
+        {
+            std::cerr << "Value is NONE!" << std::endl;
+            value = "a";
+        }
         SetCache(key, value, ttl_);
     }
 #endif

@@ -11,9 +11,9 @@ DB_VM_SERVER_PATH="/home/maoziming/rocksdb/backend/build/server/server"
 DB_VM_DB_PATH="/home/maoziming/rocksdb/backend/build/test.db"
 DB_VM_LOG_DIR="/home/maoziming/rocksdb/backend/build/logs"
 DB_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$DB_VM_IP"
-# BENCHMARKS=("invalidate_bench" "ttl_bench" "stale_bench" "update_bench")
-BENCHMARKS=("adaptive_bench")
+BENCHMARKS=("invalidate_bench" "ttl_bench" "stale_bench" "update_bench" "adaptive_bench")
 DATASETS=("Meta" "Twitter" "IBM" "Alibaba" "Tencent")
+
 cd /home/maoziming/memcached/cache/build/
 make -j
 
@@ -26,8 +26,8 @@ if [ $? -ne 0 ]; then
 fi
 
 # Loop over each benchmark and dataset combination
-for DATASET in "${DATASETS[@]}"; do
-    for BENCHMARK in "${BENCHMARKS[@]}"; do
+for BENCHMARK in "${BENCHMARKS[@]}"; do
+    for DATASET in "${DATASETS[@]}"; do
         # Step 1: Start fresh memcached on Cache VM
         echo "Starting fresh memcached on Cache VM..."
         sudo pkill memcached

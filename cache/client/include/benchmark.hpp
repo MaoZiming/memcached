@@ -15,6 +15,10 @@
 #include "tqdm.hpp"
 #include "workload.hpp"
 
+const int C_I = 10;
+const int C_U = 46;
+const int C_M = C_I + C_U;
+
 #define ASSERT(condition, message)             \
     do                                         \
     {                                          \
@@ -144,7 +148,9 @@ void benchmark_thread(Client &client, int start_op, int end_op, int ttl, float e
             }
             else
             {
-                // std::cout << "Read: " << key << std::endl;
+#ifdef DEBUG
+                std::cout << "Read: " << key << std::endl;
+#endif
                 std::string result = client.Get(key);
             }
 
@@ -206,6 +212,48 @@ void benchmark(Client &client, int ttl, float ew, std::string workload_str = "Po
     }
 
     workload->init();
+
+    if (skip_exp && client.get_tracker())
+    {
+        // Only to get the overhead of the tracker.
+        Tracker *tracker = client.get_tracker();
+        Tracker *gold_tracker = new EveryKeyTracker();
+        int correct = 0;
+        int correct_pred = 0;
+        int wrong = 0;
+        int wrong_pred = 0;
+        for (int i = 0; i < workload->num_operations(); i++)
+        {
+            // std::cout << i << "/" << workload->num_operations() << std::endl;
+            if (workload->get_is_write(i))
+            {
+                std::string key = workload->get_key(i);
+                tracker->write(key);
+                gold_tracker->write(key);
+                if (tracker->get_ew(key) == gold_tracker->get_ew(key))
+                {
+                    correct += 1;
+                }
+                else
+                {
+                    wrong += 1;
+                }
+
+                if (C_U * tracker->get_ew(key) > C_I + C_M == C_U * gold_tracker->get_ew(key) > C_I + C_M)
+                    correct_pred += 1;
+                else
+                    wrong_pred += 1;
+            }
+            else
+            {
+                tracker->read(workload->get_key(i));
+                gold_tracker->read(workload->get_key(i));
+            }
+        }
+        std::cout << "Correct rate: " << (float)correct / (correct + wrong) << std::endl;
+        std::cout << "Correct pred rate: " << (float)correct_pred / (correct_pred + wrong_pred) << std::endl;
+        std::cout << "Storage serving: " << (float)gold_tracker->get_storage_overhead() / tracker->get_storage_overhead() << std::endl;
+    }
 
     if (skip_exp)
         return;

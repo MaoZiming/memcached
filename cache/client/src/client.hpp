@@ -69,6 +69,10 @@ public:
     bool Set(const std::string &key, const std::string &value, int ttl = 0);
     bool SetTTL(const int32_t &ttl);
     void SetTracker(Tracker *tracker);
+    Tracker *getTracker(void)
+    {
+        return tracker_;
+    }
     float GetMR(void);
 
 private:
@@ -91,6 +95,10 @@ public:
     std::string GetLocalCache(const std::string &key);
     memcached_st *create_mc(void);
     void free_mc(memcached_st *memc);
+    Tracker *get_tracker(void)
+    {
+        return cache_client_->getTracker();
+    }
 
 private:
     std::unique_ptr<DBClient> db_client_;
@@ -99,7 +107,7 @@ private:
     memcached_pool_st *pool;
 };
 
-const int LONG_TTL = 10000;
+const int LONG_TTL = 0; /* Never expires */
 
 const int ADAPTIVE_EW = 0;
 const int TTL_EW = -2;

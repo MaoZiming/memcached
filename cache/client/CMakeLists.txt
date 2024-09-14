@@ -73,6 +73,12 @@ add_executable(
     ${SOURCES}
 )
 
+add_executable(
+    sketches
+    bench/sketches.cpp
+    ${SOURCES}
+)
+
 target_link_libraries(client
     PRIVATE
     myproto
@@ -117,6 +123,13 @@ target_link_libraries(stale_bench
 
 
 target_link_libraries(dataset
+    PRIVATE
+    myproto
+    /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
+)
+
+target_link_libraries(sketches
     PRIVATE
     myproto
     /usr/local/lib/libmemcached.so

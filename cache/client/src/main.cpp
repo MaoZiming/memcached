@@ -6,14 +6,14 @@
 
 int main(int argc, char *argv[])
 {
-    Tracker tracker;
+    Tracker *tracker = new EveryKeyTracker();
 
     // Create a channel to connect to the server
     Client client(grpc::CreateChannel("10.128.0.34:50051",
                                       grpc::InsecureChannelCredentials()),
                   grpc::CreateChannel("10.128.0.33:50051",
                                       grpc::InsecureChannelCredentials()),
-                  &tracker);
+                  tracker);
 
     // Example usage of Set and Get
     std::string key = "example_key3";

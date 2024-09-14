@@ -43,7 +43,7 @@ bool DBClient::Put(const std::string &key, const std::string &value, float ew)
     if (tracker_)
     {
         assert(ew == ADAPTIVE_EW);
-        ew = tracker_->get(key);
+        ew = tracker_->get_ew(key);
         request.set_ew(ew);
     }
     else
@@ -78,7 +78,7 @@ bool DBClient::PutWarm(const std::string &key, const std::string &value)
     DBPutRequest request;
     request.set_key(key);
     request.set_value(value);
-    request.set_ew(TTL_EW);
+    request.set_ew(TTL_EW); // No update or invalidate
 
     DBPutResponse response;
     ClientContext context;
