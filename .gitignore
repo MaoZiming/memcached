@@ -47,3 +47,4 @@ memcached-*.tar.gz.sha1
 cache/dataset
 cache/bench/*log
 cache/key
+cache/bench/sketches/

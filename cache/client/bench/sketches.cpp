@@ -25,20 +25,30 @@ int main(int argc, char *argv[])
     if (argc == 3)
         tracker_str = argv[2];
 
+    std::cerr << "\nSketch: " << tracker_str << ", workload: " << workload << std::endl;
+
     Tracker *tracker;
 
     if (tracker_str == "EveryKeyTracker")
     {
         tracker = new EveryKeyTracker();
     }
-    else if (tracker_str == "SketchesTracker")
+    else if (tracker_str == "TopKSketchTracker")
     {
-        tracker = new SketchesTracker();
+        tracker = new TopKSketchTracker();
     }
     else if (tracker_str == "MinSketchTracker")
     {
         tracker = new MinSketchTracker();
     }
+    else if (tracker_str == "ExactRWTracker")
+    {
+        tracker = new ExactRWTracker();
+    }
+    else if (tracker_str == "MinSketchConsTracker")
+        tracker = new MinSketchConsTracker();
+    else if (tracker_str == "TopKSketchSampleTracker")
+        tracker = new TopKSketchSampleTracker();
     else
     {
         std::cerr << "Tracker unrecognized: " << tracker_str << std::endl;

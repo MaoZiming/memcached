@@ -24,6 +24,18 @@ struct request
     int value_size;
 };
 
+bool contains_letters(const std::string &str)
+{
+    for (char ch : str)
+    {
+        if (std::isalpha(ch))
+        {
+            return true; // If the string contains any letters, return true
+        }
+    }
+    return false;
+}
+
 class Workload
 {
 public:
@@ -35,7 +47,17 @@ public:
         report_stats();
     }
 
-    virtual void generateRequests(void) = 0;
+    /* For tracker benchmark (sketch) */
+    void init_ew()
+    {
+        // num_operations_ = 50000000 / 10;
+        num_operations_ = 20000000;
+        std::cerr << "Generate requests" << std::endl;
+        generateRequests(num_operations_); // Calls the derived class's generateRequests method
+        report_stats();
+    }
+
+    virtual void generateRequests(int num_ops = -1) = 0;
 
     virtual ~Workload() = default;
 
@@ -45,6 +67,25 @@ public:
         assert(i < intervals_.size());
 #endif
         return intervals_[i].key;
+    }
+
+    int get_num_keys()
+    {
+        // Cache the results.
+        if (num_distinct_keys != -1)
+            return num_distinct_keys;
+
+        std::unordered_set<std::string> unique_keys;
+
+        // Iterate over the intervals and add keys to the unordered_set
+        for (const auto &req : intervals_)
+        {
+            unique_keys.insert(req.key);
+        }
+
+        num_distinct_keys = unique_keys.size();
+        // The size of the unordered_set will give the number of distinct keys
+        return unique_keys.size();
     }
 
     std::string get_value_from_size(int value_size)
@@ -188,6 +229,7 @@ public:
     void report_stats()
     {
         std::cout << "Total requests: " << intervals_.size() << std::endl;
+        std::cout << "Total number of distinct keys: " << get_num_keys() << std::endl;
         std::cout << "Read Ratio: " << get_read_write_ratio() << std::endl;
 
         // Report value size stats
@@ -199,6 +241,8 @@ public:
         std::cout << "Average Interval: " << get_average_interval() << " ms" << std::endl;
         std::cout << "Min Interval: " << get_min_interval() << " ms" << std::endl;
         std::cout << "Max Interval: " << get_max_interval() << " ms" << std::endl;
+
+        std::cout << "Scale factor: " << scale_factor_ << std::endl;
     }
 
     std::unordered_map<std::string, int> keys_to_val_size;
@@ -220,11 +264,14 @@ public:
         return std::max(0, std::min(1000000, value_size));
     }
 
+    int num_distinct_keys = -1;
+    int scale_factor_ = 1; // Will be modified.
+
 protected:
     std::vector<request> intervals_;
     std::chrono::milliseconds last_op_time{0};
     std::chrono::milliseconds max_interval_{1000};
-    int scale_factor_ = 1;
+    int num_operations_ = 200000;
 
     std::vector<std::string>
     getSortedFiles(const std::string &directory_path)
@@ -254,8 +301,10 @@ public:
     int key_size_in_KB = 100;
 
 private:
-    void generateRequests(void) override
+    void generateRequests(int num_ops = -1) override
     {
+        if (num_ops != -1)
+            num_operations_ = num_ops;
         // Same seed.
         std::default_random_engine generator(0);
         std::exponential_distribution<double> distribution(lambda);
@@ -302,8 +351,10 @@ private:
 
 class PoissonMixWorkload : public PoissonWorkload
 {
-    void generateRequests(void) override
+    void generateRequests(int num_ops = -1) override
     {
+        if (num_ops != -1)
+            num_operations_ = num_ops;
         // Same seed.
         std::default_random_engine generator(0);
         std::exponential_distribution<double> distribution(lambda);
@@ -360,8 +411,10 @@ class PoissonMixWorkload : public PoissonWorkload
 class PoissonWriteWorkload : public PoissonWorkload
 {
 private:
-    void generateRequests(void) override
+    void generateRequests(int num_ops = -1) override
     {
+        if (num_ops != -1)
+            num_operations_ = num_ops;
         // Same seed.
         std::default_random_engine generator(0);
         std::exponential_distribution<double> distribution(lambda);
@@ -410,8 +463,11 @@ private:
 class MetaWorkload : public Workload
 {
 private:
-    void generateRequests(void) override
+    void generateRequests(int num_ops = -1) override
     {
+        if (num_ops != -1)
+            num_operations_ = num_ops;
+
         std::string directory_path = file_name_;
         int i = 0;
 
@@ -430,10 +486,10 @@ private:
                 std::getline(ss, token, ','); // op_time
                 std::chrono::milliseconds op_time(std::stoll(token) * 1000);
 
-                std::getline(ss, token, ','); // key (not used)
+                std::getline(ss, token, ','); // key
                 std::string key = token;
 
-                std::getline(ss, token, ','); // key_size (not used)
+                std::getline(ss, token, ','); // key_size
                 int key_size = std::stoi(token);
 
                 std::getline(ss, token, ','); // op
@@ -466,10 +522,19 @@ private:
 
 class TwitterWorkload : public Workload
 {
+public:
+    TwitterWorkload()
+    {
+        scale_factor_ = 3;
+    }
 
 private:
-    void generateRequests(void) override
+    void generateRequests(int num_ops = -1) override
     {
+
+        if (num_ops != -1)
+            num_operations_ = num_ops;
+
         std::string directory_path = file_name_;
         int i = 0;
 
@@ -483,42 +548,80 @@ private:
 
                 while (std::getline(file, line))
                 {
-                    std::istringstream ss(line);
-                    std::string token;
-                    std::string key, op;
-                    std::chrono::milliseconds op_time(0);
-                    int ttl = 0;
-
-                    // Parse fields from CSV
-                    std::getline(ss, token, ','); // op_time
-                    op_time = std::chrono::milliseconds(std::stoll(token) * 1000);
-                    int key_size, value_size = 0;
-
-                    std::getline(ss, key, ',');   // key
-                    std::getline(ss, token, ','); // key_size
-                    key_size = std::stoi(token);
-                    std::getline(ss, token, ','); // Value_size
-                    value_size = std::stoi(token);
-                    std::getline(ss, token, ','); // misc4 (ignored)
-                    std::getline(ss, op, ',');    // op (get/set)
-
-                    std::getline(ss, token, ','); // ttl
-                    ttl = std::stoi(token);
-
-                    if (i >= num_operations_)
+                    try
                     {
-                        break;
-                    }
+                        std::istringstream ss(line);
+                        std::string token;
+                        std::string key, op;
+                        std::chrono::milliseconds op_time(0);
+                        int ttl = 0;
 
-                    request r;
-                    r.interval = get_interval(op_time);
-                    r.is_write = (op != "get" && op != "gets");
-                    r.key = key;
-                    std::string value = std::string(key_size + value_size, 'a');
-                    r.value_size = get_value_size(key_size + value_size);
-                    i += 1;
-                    intervals_.push_back(r);
-                    keys_to_val_size[key] = r.value_size;
+                        // Parse fields from CSV
+                        std::getline(ss, token, ','); // op_time
+                        op_time = std::chrono::milliseconds(std::stoll(token) * 1000);
+                        int key_size, value_size = 0;
+
+                        // Collect the key which may contain letters and commas
+                        std::getline(ss, key, ',');
+                        while (ss.peek() != EOF)
+                        {
+                            std::string next_token;
+                            std::getline(ss, next_token, ',');
+
+                            // Check if the next token contains letters
+                            if (contains_letters(next_token))
+                            {
+                                // Invalid argument during parsing: stoi
+                                // 49,Pi7rYUYmkQ0YjUG-C7Qm--SzguSz1SEzK1SzgfqqK,OzugOuffOESgOguSgzf---Kgg,67,1225,623,get,0
+                                key += "," + next_token; // Append the next token to the key
+                            }
+                            else
+                            {
+                                // If the next token doesn't contain letters, break and move to key_size
+                                token = next_token;
+                                break;
+                            }
+                        }
+                        // std::getline(ss, token, ','); // key_size
+                        key_size = std::stoi(token);
+                        std::getline(ss, token, ','); // Value_size
+                        value_size = std::stoi(token);
+                        std::getline(ss, token, ','); // misc4 (ignored)
+                        std::getline(ss, op, ',');    // op (get/set)
+
+                        std::getline(ss, token, ','); // ttl
+                        ttl = std::stoi(token);
+
+                        if (i >= num_operations_)
+                        {
+                            break;
+                        }
+
+                        request r;
+                        r.interval = get_interval(op_time);
+                        r.is_write = (op != "get" && op != "gets");
+                        r.key = key;
+                        std::string value = std::string(key_size + value_size, 'a');
+                        r.value_size = get_value_size(key_size + value_size);
+                        i += 1;
+                        intervals_.push_back(r);
+                        keys_to_val_size[key] = r.value_size;
+                    }
+                    catch (const std::invalid_argument &e)
+                    {
+                        std::cerr << "Invalid argument during parsing: " << e.what() << std::endl;
+                        std::cerr << line << std::endl;
+                    }
+                    catch (const std::out_of_range &e)
+                    {
+                        std::cerr << "Out of range error during parsing: " << e.what() << std::endl;
+                        std::cerr << line << std::endl;
+                    }
+                    catch (const std::exception &e)
+                    {
+                        std::cerr << "An error occurred: " << e.what() << std::endl;
+                        std::cerr << line << std::endl;
+                    }
                 }
             }
         }
@@ -526,7 +629,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Twitter/2020Mar";
-    int num_operations_ = 3000000;
+    int num_operations_ = 1000000;
 };
 
 class IBMWorkload : public Workload
@@ -535,12 +638,16 @@ public:
     IBMWorkload()
     {
         max_interval_ = std::chrono::milliseconds{200};
+        scale_factor_ = 100;
     }
 
 private:
     // Problem: ObjectStoreTrace object size is quite big. 100s MB.
-    void generateRequests(void) override
+    void generateRequests(int num_ops = -1) override
     {
+        if (num_ops != -1)
+            num_operations_ = num_ops;
+
         std::string directory_path = file_name_;
 
         int i = 0;
@@ -599,16 +706,18 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/IBM/data";
-    int num_operations_ = 60000;
-    int scale_factor_ = 5;
+    int num_operations_ = 100000;
 };
 
 class TencentWorkload : public Workload
 {
     // Reference: https://github.com/1a1a11a/libCacheSim/blob/develop/libCacheSim/bin/dep/cpp/tencent.h
 private:
-    void generateRequests(void) override
+    void generateRequests(int num_ops = -1) override
     {
+        if (num_ops != -1)
+            num_operations_ = num_ops;
+
         std::string directory_path = file_name_;
         int i = 0;
 
@@ -669,8 +778,10 @@ private:
 class AlibabaWorkload : public Workload
 {
 private:
-    void generateRequests(void) override
+    void generateRequests(int num_ops = -1) override
     {
+        if (num_ops != -1)
+            num_operations_ = num_ops;
         int i = 0;
 
         // Open the trace file
@@ -728,15 +839,18 @@ private:
     }
 
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Alibaba/alibaba_block_traces_2020/io_traces.csv";
-    int num_operations_ = 300000;
+    int num_operations_ = 100000;
 };
 
 class WikiCDNWorkload : public Workload
 {
     // Reference: /home/maoziming/memcached/cache/dataset/WikiCDN
 private:
-    void generateRequests(void) override
+    void generateRequests(int num_ops = -1) override
     {
+        if (num_ops != -1)
+            num_operations_ = num_ops;
+
         std::string directory_path = file_name_;
         int i = 0;
 

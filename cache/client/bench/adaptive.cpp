@@ -21,8 +21,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    std::string workload = argv[1]; // Capture workload string from the command line
-    std::string tracker_str = "EveryKeyTracker";
+    std::string workload = argv[1];                // Capture workload string from the command line
+    std::string tracker_str = "TopKSketchTracker"; // Set TopKSketchTracker to be the default.
 
     if (argc == 3)
         tracker_str = argv[2];
@@ -33,10 +33,22 @@ int main(int argc, char *argv[])
     {
         tracker = new EveryKeyTracker();
     }
-    else if (tracker_str == "SketchesTracker")
+    else if (tracker_str == "TopKSketchTracker")
     {
-        tracker = new SketchesTracker(500);
+        tracker = new TopKSketchTracker();
     }
+    else if (tracker_str == "MinSketchTracker")
+    {
+        tracker = new MinSketchTracker();
+    }
+    else if (tracker_str == "ExactRWTracker")
+    {
+        tracker = new ExactRWTracker();
+    }
+    else if (tracker_str == "MinSketchConsTracker")
+        tracker = new MinSketchConsTracker();
+    else if (tracker_str == "TopKSketchSampleTracker")
+        tracker = new TopKSketchSampleTracker();
     else
     {
         std::cerr << "Tracker unrecognized: " << tracker_str << std::endl;

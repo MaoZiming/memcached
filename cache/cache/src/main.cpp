@@ -11,9 +11,16 @@
 #include <memory>
 #include "client.hpp"
 #include <atomic>
+#include <thread>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <cassert> // For assert()
 
 using grpc::Server;
+using grpc::ServerAsyncResponseWriter;
 using grpc::ServerBuilder;
+using grpc::ServerCompletionQueue;
 using grpc::ServerContext;
 using grpc::Status;
 
@@ -21,17 +28,13 @@ using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 
-// #define DEBUG
-
-class CacheServiceImpl final : public CacheService::Service
+class CacheServiceImpl final
 {
 public:
     CacheServiceImpl(std::shared_ptr<Channel> db_channel)
         : db_client_(db_channel)
     {
-        // memc = create_mc();
-        const char *config_string =
-            "--SERVER=localhost:11211";
+        const char *config_string = "--SERVER=localhost:11211";
 
         pool = memcached_pool(config_string, strlen(config_string));
         assert(pool != nullptr);
@@ -39,9 +42,9 @@ public:
 
     ~CacheServiceImpl()
     {
+        server_->Shutdown();
+        cq_->Shutdown();
         memcached_pool_destroy(pool);
-        // if (memc)
-        //     memcached_free(memc);
     }
 
     memcached_st *create_mc(void)
@@ -62,277 +65,393 @@ public:
         memcached_pool_push(pool, memc);
     }
 
-    memcached_st *_create_mc(void)
+    void Run()
     {
-        memcached_return rc;
-        memcached_st *memc = memcached_create(NULL);
-        memcached_server_st *servers = memcached_server_list_append(NULL, "localhost", 11211, &rc);
-        servers = memcached_server_list_append(servers, "localhost", 11212, &rc);
-        memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_NO_BLOCK, 1);
-        rc = memcached_server_push(memc, servers);
-        memcached_server_list_free(servers);
+        std::string server_address("10.128.0.34:50051");
 
-        if (rc != MEMCACHED_SUCCESS)
-        {
-            throw std::runtime_error("Failed to connect to Memcached server.");
-        }
-        return memc;
+        ServerBuilder builder;
+        builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+        builder.RegisterService(&async_service_);
+
+        cq_ = builder.AddCompletionQueue();
+
+        server_ = builder.BuildAndStart();
+        std::cout << "Async server listening on " << server_address << std::endl;
+
+        CacheServiceImpl::HandleRpcs();
+        // Start the thread that will process RPCs
+        // server_thread_ = std::thread(&CacheServiceImpl::HandleRpcs, this);
     }
 
-    void _free_mc(memcached_st *memc)
+    void Shutdown()
     {
-        memcached_free(memc);
-    }
-
-    grpc::Status Get(grpc::ServerContext *context, const CacheGetRequest *request, CacheGetResponse *response) override
-    {
-        char *value = nullptr;
-        size_t value_length = 0;
-        uint32_t flags = 0;
-        memcached_return_t result;
-        memcached_st *memc = create_mc();
-
-#ifdef DEBUG
-        std::cout << "Get: " << request->key() << std::endl;
-        std::cout << request->key() << std::endl;
-#endif
-        value = memcached_get(memc, request->key().c_str(), request->key().size(), &value_length, &flags, &result);
-        if (result == MEMCACHED_SUCCESS)
-        {
-            cache_hits_++;
-#ifdef DEBUG
-            std::cout << "key: " << request->key() << ", Cache Hit!" << std::endl;
-#endif
-            response->set_value(std::string(value, value_length));
-            response->set_success(true);
-        }
-        else
-        {
-            cache_miss_++;
-#ifdef DEBUG
-            std::cout << "key: " << request->key() << ", Cache Miss!" << std::endl;
-#endif
-            // Cache miss: fetch from the database
-
-#ifndef CLIENT_DRIVEN_FILL
-            std::cout << "Miss Key: " << request->key() << std::endl;
-            std::string db_value = db_client_.Get(request->key());
-            std::cout << "Miss key finished: " << request->key() << std::endl;
-            if (!db_value.empty())
-            {
-                response->set_value(db_value);
-                response->set_success(true);
-
-                // Optionally, cache the value for future requests
-                memcached_return_t set_result;
-                set_result = memcached_set(memc, request->key().c_str(), request->key().size(), db_value.c_str(), db_value.size(), (time_t)ttl_, (uint32_t)0);
-
-                /*
-                  MEMCACHED_SUCCESS,
-                  MEMCACHED_FAILURE,
-                  MEMCACHED_HOST_LOOKUP_FAILURE, // getaddrinfo() and getnameinfo() only
-                  MEMCACHED_CONNECTION_FAILURE,
-                  MEMCACHED_CONNECTION_BIND_FAILURE, // DEPRECATED, see MEMCACHED_HOST_LOOKUP_FAILURE
-                  MEMCACHED_WRITE_FAILURE,
-                  MEMCACHED_READ_FAILURE,
-                  MEMCACHED_UNKNOWN_READ_FAILURE,
-                  MEMCACHED_PROTOCOL_ERROR,
-                  MEMCACHED_CLIENT_ERROR,
-                  MEMCACHED_SERVER_ERROR, // Server returns "SERVER_ERROR"
-                  MEMCACHED_ERROR,        // Server returns "ERROR"
-                  MEMCACHED_DATA_EXISTS,
-                  MEMCACHED_DATA_DOES_NOT_EXIST,
-                  MEMCACHED_NOTSTORED,
-                  MEMCACHED_STORED,
-                  MEMCACHED_NOTFOUND,
-                  MEMCACHED_MEMORY_ALLOCATION_FAILURE,
-                  MEMCACHED_PARTIAL_READ,
-                  MEMCACHED_SOME_ERRORS,
-                  MEMCACHED_NO_SERVERS,
-                  MEMCACHED_END,
-                  MEMCACHED_DELETED,
-                  MEMCACHED_VALUE,
-                  MEMCACHED_STAT,
-                  MEMCACHED_ITEM,
-                  MEMCACHED_ERRNO,
-                  MEMCACHED_FAIL_UNIX_SOCKET,
-                  MEMCACHED_NOT_SUPPORTED,
-                  MEMCACHED_NO_KEY_PROVIDED,
-                  MEMCACHED_FETCH_NOTFINISHED,
-                  MEMCACHED_TIMEOUT,
-                  MEMCACHED_BUFFERED,
-                */
-
-                if (set_result == MEMCACHED_BUFFERED || set_result == MEMCACHED_DELETED || set_result == MEMCACHED_END || set_result == MEMCACHED_ITEM || set_result == MEMCACHED_STAT || set_result == MEMCACHED_STORED || set_result == MEMCACHED_SUCCESS || set_result == MEMCACHED_VALUE)
-                {
-                    // std::cerr << "Success: " << memcached_strerror(memc, set_result) << ", TTL: " << ttl_ << ", key: " << request->key() << ", value length: " << db_value.length() << ", key length: " << request->key().length() << std::endl;
-                    ;
-                }
-                else
-                {
-                    std::cerr << "Failure: " << memcached_strerror(memc, set_result) << ", TTL: " << ttl_ << ", key: " << request->key() << ", value: " << db_value.length() << ", key length: " << request->key().length() << std::endl;
-                }
-#ifdef DEBUG
-                if (set_result != MEMCACHED_SUCCESS)
-                {
-                    std::cout << set_result << std::endl;
-                    std::cout << "Cache: " << ttl_ << ", key: " << request->key() << ", value: " << db_value << ", key length: " << request->key().length() << std::endl;
-                }
-
-                assert(set_result == MEMCACHED_SUCCESS);
-
-                // TODO: For some reason doesn't work
-                memcached_return_t get_result;
-                char *value = memcached_get(memc, request->key().c_str(), request->key().size(), &value_length, &flags, &get_result);
-
-                if (value == NULL)
-                {
-                    std::cout << "Cache: " << ttl_ << ", key: " << request->key() << ", value: " << db_value << ", key length: " << request->key().length() << std::endl;
-                    std::cout << set_result << std::endl;
-                    std::cout << get_result << std::endl;
-                }
-                assert(value != NULL);
-#endif
-            }
-            else
-            {
-                std::cerr << "DB Key not found." << std::endl;
-                response->set_success(false);
-            }
-#else
-            // Let client fetches the value from the DB.
-            response->set_value("");
-            response->set_success(false);
-#endif
-        }
-
-        // if (value)
-        // {
-        //     free(value);
-        // }
-        free_mc(memc);
-        return grpc::Status::OK;
-    }
-
-    grpc::Status Set(grpc::ServerContext *context, const CacheSetRequest *request, CacheSetResponse *response) override
-    {
-        memcached_return_t result;
-
-        memcached_st *memc = create_mc();
-
-#ifdef DEBUG
-        std::cout << "Set: " << request->key() << ", " << request->value()
-                  << ", TTL: " << request->ttl() << std::endl;
-#endif
-
-        // Convert ttl to time_t. Using (time_t)request->ttl() is sufficient as it should be already in seconds.
-        time_t ttl = static_cast<time_t>(request->ttl());
-
-        result = memcached_set(memc, request->key().c_str(), request->key().size(),
-                               request->value().c_str(), request->value().size(),
-                               ttl, (uint32_t)0);
-        if (result == MEMCACHED_SUCCESS)
-        {
-            response->set_success(true);
-        }
-        else
-        {
-            response->set_success(false);
-        }
-        free_mc(memc);
-        return grpc::Status::OK;
-    }
-
-    grpc::Status SetTTL(grpc::ServerContext *context, const CacheSetTTLRequest *request, CacheSetTTLResponse *response) override
-    {
-        memcached_return_t result;
-
-#ifdef DEBUG
-        std::cout << "SetTTL: " << request->ttl() << std::endl;
-#endif
-
-        ttl_ = request->ttl();
-        response->set_success(true);
-
-        return grpc::Status::OK;
-    }
-
-    grpc::Status GetMR(grpc::ServerContext *context, const CacheGetMRRequest *request, CacheGetMRResponse *response) override
-    {
-        memcached_return_t result;
-
-        response->set_success(true);
-#ifdef DEBUG
-        std::cout << "cache_hits_: " << cache_hits_.load() << ", " << "cache_miss_: " << cache_miss_.load() << std::endl;
-#endif
-        if (cache_hits_.load() + cache_miss_.load() > 0)
-            response->set_mr(static_cast<float>(cache_miss_.load()) / (cache_hits_.load() + cache_miss_.load()));
-        else
-            response->set_mr(-1);
-
-        return grpc::Status::OK;
-    }
-
-    grpc::Status Invalidate(grpc::ServerContext *context, const CacheInvalidateRequest *request, CacheInvalidateResponse *response) override
-    {
-        memcached_return_t result;
-#ifdef DEBUG
-        std::cout << "Invalidate: " << request->key() << std::endl;
-#endif
-
-        memcached_st *memc = create_mc();
-        result = memcached_delete(memc, request->key().c_str(), request->key().size(),
-                                  (time_t)0);
-        if (result == MEMCACHED_SUCCESS)
-        {
-            response->set_success(true);
-        }
-        else
-        {
-            response->set_success(false);
-        }
-        free_mc(memc);
-        return grpc::Status::OK;
-    }
-
-    grpc::Status Update(grpc::ServerContext *context, const CacheUpdateRequest *request, CacheUpdateResponse *response) override
-    {
-        memcached_return_t result;
-        memcached_st *memc = create_mc();
-
-#ifdef DEBUG
-        std::cout << "Update: " << request->key()
-                  << std::endl;
-#endif
-        result = memcached_replace(memc, request->key().c_str(), request->key().size(),
-                                   request->value().c_str(), request->value().size(),
-                                   (time_t)0, (uint32_t)0);
-        if (result == MEMCACHED_SUCCESS)
-        {
-            response->set_success(true);
-        }
-        else
-        {
-            response->set_success(false);
-        }
-        free_mc(memc);
-        return grpc::Status::OK;
+        server_->Shutdown();
+        cq_->Shutdown();
+        if (server_thread_.joinable())
+            server_thread_.join();
     }
 
 private:
-    // memcached_st *memc;
+    class CallDataBase
+    {
+    public:
+        virtual void Proceed(bool ok) = 0;
+        virtual ~CallDataBase() {}
+    };
+
+    // Implementations for each RPC method
+    template <typename ServiceType, typename RequestType, typename ResponseType>
+    class CallData : public CallDataBase
+    {
+    public:
+        CallData(ServiceType *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+            : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE), impl_(impl)
+        {
+            // Do not call Proceed() here
+        }
+
+        void Proceed(bool ok) override
+        {
+            if (status_ == CREATE)
+            {
+                status_ = PROCESS;
+                // Request the next RPC
+                RequestRPC();
+            }
+            else if (status_ == PROCESS)
+            {
+                // Spawn a new instance to serve new clients while we process the current one
+                CreateNewInstance();
+                ProcessRequest();
+                status_ = FINISH;
+                responder_.Finish(response_, Status::OK, this);
+            }
+            else
+            {
+                delete this;
+            }
+        }
+
+    protected:
+        virtual void RequestRPC() = 0;
+        virtual void ProcessRequest() = 0;
+        virtual void CreateNewInstance() = 0;
+
+        typename std::remove_pointer<ServiceType>::type *service_;
+        ServerCompletionQueue *cq_;
+        ServerContext ctx_;
+        RequestType request_;
+        ResponseType response_;
+        ServerAsyncResponseWriter<ResponseType> responder_;
+        enum CallStatus
+        {
+            CREATE,
+            PROCESS,
+            FINISH
+        };
+        CallStatus status_;
+        CacheServiceImpl *impl_;
+    };
+
+    // Specific CallData implementations for each RPC
+    class GetCallData : public CallData<CacheService::AsyncService, CacheGetRequest, CacheGetResponse>
+    {
+    public:
+        GetCallData(CacheService::AsyncService *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+            : CallData(service, cq, impl)
+        {
+        }
+
+    protected:
+        void RequestRPC() override
+        {
+            service_->RequestGet(&ctx_, &request_, &responder_, cq_, cq_, this);
+        }
+
+        void CreateNewInstance() override
+        {
+            auto *new_call = new GetCallData(service_, cq_, impl_);
+            new_call->Proceed(true);
+        }
+
+        void ProcessRequest() override
+        {
+            char *value = nullptr;
+            size_t value_length = 0;
+            uint32_t flags = 0;
+            memcached_return_t result;
+            memcached_st *memc = impl_->create_mc();
+            value = memcached_get(memc, request_.key().c_str(), request_.key().size(), &value_length, &flags, &result);
+            if (result == MEMCACHED_SUCCESS)
+            {
+                impl_->cache_hits_++;
+                response_.set_value(std::string(value, value_length));
+                response_.set_success(true);
+                free(value); // Free allocated memory
+            }
+            else
+            {
+#ifdef DEBUG
+                std::cerr << "Miss: " << request_.key() << std::endl;
+#endif
+                impl_->cache_miss_++;
+                impl_->db_client_.AsyncFill(request_.key(), impl_->pool, impl_->ttl_);
+                response_.set_value(std::string("Later"));
+                response_.set_success(true);
+            }
+            impl_->free_mc(memc);
+        }
+    };
+
+    class SetCallData : public CallData<CacheService::AsyncService, CacheSetRequest, CacheSetResponse>
+    {
+    public:
+        SetCallData(CacheService::AsyncService *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+            : CallData(service, cq, impl)
+        {
+        }
+
+    protected:
+        void RequestRPC() override
+        {
+            service_->RequestSet(&ctx_, &request_, &responder_, cq_, cq_, this);
+        }
+
+        void CreateNewInstance() override
+        {
+            auto *new_call = new SetCallData(service_, cq_, impl_);
+            new_call->Proceed(true);
+        }
+
+        void ProcessRequest() override
+        {
+            memcached_return_t result;
+            memcached_st *memc = impl_->create_mc();
+            time_t ttl = static_cast<time_t>(request_.ttl());
+            result = memcached_set(memc, request_.key().c_str(), request_.key().size(),
+                                   request_.value().c_str(), request_.value().size(),
+                                   ttl, (uint32_t)0);
+            response_.set_success(result == MEMCACHED_SUCCESS);
+            impl_->free_mc(memc);
+        }
+    };
+
+    class SetTTLCallData : public CallData<CacheService::AsyncService, CacheSetTTLRequest, CacheSetTTLResponse>
+    {
+    public:
+        SetTTLCallData(CacheService::AsyncService *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+            : CallData(service, cq, impl)
+        {
+        }
+
+    protected:
+        void RequestRPC() override
+        {
+            service_->RequestSetTTL(&ctx_, &request_, &responder_, cq_, cq_, this);
+        }
+
+        void CreateNewInstance() override
+        {
+            auto *new_call = new SetTTLCallData(service_, cq_, impl_);
+            new_call->Proceed(true);
+        }
+
+        void ProcessRequest() override
+        {
+            impl_->ttl_ = request_.ttl();
+            response_.set_success(true);
+        }
+    };
+
+    class GetMRCallData : public CallData<CacheService::AsyncService, CacheGetMRRequest, CacheGetMRResponse>
+    {
+    public:
+        GetMRCallData(CacheService::AsyncService *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+            : CallData(service, cq, impl)
+        {
+        }
+
+    protected:
+        void RequestRPC() override
+        {
+            service_->RequestGetMR(&ctx_, &request_, &responder_, cq_, cq_, this);
+        }
+
+        void CreateNewInstance() override
+        {
+            auto *new_call = new GetMRCallData(service_, cq_, impl_);
+            new_call->Proceed(true);
+        }
+
+        void ProcessRequest() override
+        {
+            response_.set_success(true);
+            int32_t hits = impl_->cache_hits_.load();
+            int32_t misses = impl_->cache_miss_.load();
+            if (hits + misses > 0)
+                response_.set_mr(static_cast<float>(misses) / (hits + misses));
+            else
+                response_.set_mr(-1);
+        }
+    };
+
+    class InvalidateCallData : public CallData<CacheService::AsyncService, CacheInvalidateRequest, CacheInvalidateResponse>
+    {
+    public:
+        InvalidateCallData(CacheService::AsyncService *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+            : CallData(service, cq, impl)
+        {
+        }
+
+    protected:
+        void RequestRPC() override
+        {
+            service_->RequestInvalidate(&ctx_, &request_, &responder_, cq_, cq_, this);
+        }
+
+        void CreateNewInstance() override
+        {
+            auto *new_call = new InvalidateCallData(service_, cq_, impl_);
+            new_call->Proceed(true);
+        }
+
+        void ProcessRequest() override
+        {
+            memcached_return_t result;
+            memcached_st *memc = impl_->create_mc();
+            result = memcached_delete(memc, request_.key().c_str(), request_.key().size(), (time_t)0);
+            response_.set_success(result == MEMCACHED_SUCCESS);
+            // std::cout << "Invalidate: " << request_.key() << std::endl;
+            impl_->free_mc(memc);
+            impl_->num_invalidates_++;
+        }
+    };
+
+    class UpdateCallData : public CallData<CacheService::AsyncService, CacheUpdateRequest, CacheUpdateResponse>
+    {
+    public:
+        UpdateCallData(CacheService::AsyncService *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+            : CallData(service, cq, impl)
+        {
+        }
+
+    protected:
+        void RequestRPC() override
+        {
+            service_->RequestUpdate(&ctx_, &request_, &responder_, cq_, cq_, this);
+        }
+
+        void CreateNewInstance() override
+        {
+            auto *new_call = new UpdateCallData(service_, cq_, impl_);
+            new_call->Proceed(true);
+        }
+
+        void ProcessRequest() override
+        {
+            memcached_return_t result;
+            memcached_st *memc = impl_->create_mc();
+            result = memcached_replace(memc, request_.key().c_str(), request_.key().size(),
+                                       request_.value().c_str(), request_.value().size(),
+                                       (time_t)0, (uint32_t)0);
+            if (result == MEMCACHED_NOTFOUND)
+            {
+                // The key does not exist in the cache
+                std::cout << "Key: " << request_.key() << "is not in cache!" << std::endl;
+            }
+            response_.set_success(result == MEMCACHED_SUCCESS);
+            // std::cout << "Update: " << request_.key() << std::endl;
+            impl_->free_mc(memc);
+            impl_->num_updates_++;
+        }
+    };
+
+    class GetFreshnessStatsCallData : public CallData<CacheService::AsyncService, CacheGetFreshnessStatsRequest, CacheGetFreshnessStatsResponse>
+    {
+    public:
+        GetFreshnessStatsCallData(CacheService::AsyncService *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+            : CallData(service, cq, impl)
+        {
+        }
+
+    protected:
+        void RequestRPC() override
+        {
+            // Request the GetFreshnessStats RPC from the gRPC service
+            service_->RequestGetFreshnessStats(&ctx_, &request_, &responder_, cq_, cq_, this);
+        }
+
+        void CreateNewInstance() override
+        {
+            // Create a new instance to handle new RPCs
+            auto *new_call = new GetFreshnessStatsCallData(service_, cq_, impl_);
+            new_call->Proceed(true);
+        }
+
+        void ProcessRequest() override
+        {
+            // Populate the response with the freshness stats
+            response_.set_num_invalidates(impl_->num_invalidates_.load());
+            response_.set_num_updates(impl_->num_updates_.load());
+            response_.set_success(true);
+        }
+    };
+
+    void HandleRpcs()
+    {
+        // Spawn new CallData instances to serve new clients.
+        auto *get_call = new GetCallData(&async_service_, cq_.get(), this);
+        get_call->Proceed(true);
+
+        auto *set_call = new SetCallData(&async_service_, cq_.get(), this);
+        set_call->Proceed(true);
+
+        auto *setttl_call = new SetTTLCallData(&async_service_, cq_.get(), this);
+        setttl_call->Proceed(true);
+
+        auto *getmr_call = new GetMRCallData(&async_service_, cq_.get(), this);
+        getmr_call->Proceed(true);
+
+        auto *invalidate_call = new InvalidateCallData(&async_service_, cq_.get(), this);
+        invalidate_call->Proceed(true);
+
+        auto *update_call = new UpdateCallData(&async_service_, cq_.get(), this);
+        update_call->Proceed(true);
+
+        auto *get_freshness_stats_call = new GetFreshnessStatsCallData(&async_service_, cq_.get(), this);
+        get_freshness_stats_call->Proceed(true);
+
+        void *tag; // uniquely identifies a request.
+        bool ok;
+        while (cq_->Next(&tag, &ok))
+        {
+            if (ok)
+            {
+                static_cast<CallDataBase *>(tag)->Proceed(true);
+            }
+            else
+            {
+                delete static_cast<CallDataBase *>(tag);
+            }
+        }
+    }
+
+    std::unique_ptr<ServerCompletionQueue> cq_;
+    CacheService::AsyncService async_service_;
+    std::unique_ptr<Server> server_;
+    std::thread server_thread_;
+
     DBClient db_client_;
     memcached_pool_st *pool;
-    // We assume a uniform ttl for the entire cache.
-    // Default to no ttl requirement.
     int32_t ttl_ = 0;
     std::atomic<int32_t> cache_hits_{0};
     std::atomic<int32_t> cache_miss_{0};
+    std::atomic<int32_t> num_invalidates_{0};
+    std::atomic<int32_t> num_updates_{0};
 };
 
 void RunServer()
 {
-    std::string server_address("10.128.0.34:50051");
     std::string db_address("10.128.0.33:50051");
     std::shared_ptr<Channel> channel = grpc::CreateChannel(db_address, grpc::InsecureChannelCredentials());
     if (!channel)
@@ -342,19 +461,13 @@ void RunServer()
     }
 
     CacheServiceImpl service(channel);
-    grpc::ServerBuilder builder;
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    builder.RegisterService(&service);
+    service.Run();
 
-    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-    if (!server)
-    {
-        std::cerr << "Failed to start server." << std::endl;
-        return;
-    }
+    // Wait for server shutdown
+    // std::cout << "Press Enter to stop the server..." << std::endl;
+    // std::cin.get();
 
-    std::cout << "Server listening on " << server_address << std::endl;
-    server->Wait();
+    service.Shutdown();
 }
 
 int main(int argc, char **argv)

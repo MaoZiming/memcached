@@ -11,8 +11,10 @@ DB_VM_SERVER_PATH="/home/maoziming/rocksdb/backend/build/server/server"
 DB_VM_DB_PATH="/home/maoziming/rocksdb/backend/build/test.db"
 DB_VM_LOG_DIR="/home/maoziming/rocksdb/backend/build/logs"
 DB_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$DB_VM_IP"
-BENCHMARKS=("invalidate_bench" "ttl_bench" "stale_bench" "update_bench" "adaptive_bench")
-DATASETS=("Meta" "Twitter" "IBM" "Alibaba" "Tencent")
+BENCHMARKS=("adaptive_bench" "invalidate_bench" "ttl_bench" "stale_bench" "update_bench" )
+DATASETS=("IBM" "Meta" "Twitter" "Alibaba" "Tencent")
+# DATASETS=("Alibaba")
+# BENCHMARKS=("adaptive_bench")
 
 cd /home/maoziming/memcached/cache/build/
 make -j
@@ -26,8 +28,8 @@ if [ $? -ne 0 ]; then
 fi
 
 # Loop over each benchmark and dataset combination
-for BENCHMARK in "${BENCHMARKS[@]}"; do
-    for DATASET in "${DATASETS[@]}"; do
+for DATASET in "${DATASETS[@]}"; do
+    for BENCHMARK in "${BENCHMARKS[@]}"; do
         # Step 1: Start fresh memcached on Cache VM
         echo "Starting fresh memcached on Cache VM..."
         sudo pkill memcached
@@ -59,6 +61,7 @@ for BENCHMARK in "${BENCHMARKS[@]}"; do
         # Step 3: SSH into DB VM, and start DB server with dynamic log path
         echo "Starting DB server on DB VM with log path $LOG_PATH..."
         $DB_VM_SSH "sudo pkill server"
+        $DB_VM_SSH "cd /home/maoziming/rocksdb/backend/build && make -j"
         sleep 5
         $DB_VM_SSH "cd /home/maoziming/rocksdb/backend/build && rm -r test.db && $DB_VM_SERVER_PATH 50051 test.db $LOG_PATH" &
         DB_SERVER_PID=$!
@@ -99,6 +102,12 @@ for BENCHMARK in "${BENCHMARKS[@]}"; do
         echo "Tearing down cache server and memcached..."
         kill $CACHE_SERVER_PID
         kill $MEMCACHED_PID
+
+        sleep 1 
+        # Step 6: Run the plot script after each experiment
+        echo "Running plot script for $BENCHMARK with dataset $DATASET..."
+        $DB_VM_SSH "source ~/miniconda3/etc/profile.d/conda.sh && conda activate rocksdb && cd /home/maoziming/rocksdb/backend/plot && python parse_log.py"
+
     done
 done
 

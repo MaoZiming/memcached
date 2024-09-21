@@ -7,6 +7,7 @@ service CacheService {
     rpc Set(CacheSetRequest) returns (CacheSetResponse);
     rpc SetTTL(CacheSetTTLRequest) returns (CacheSetTTLResponse);
     rpc GetMR(CacheGetMRRequest) returns (CacheGetMRResponse);
+    rpc GetFreshnessStats(CacheGetFreshnessStatsRequest) returns (CacheGetFreshnessStatsResponse);
     rpc Invalidate(CacheInvalidateRequest) returns (CacheInvalidateResponse);
     rpc Update(CacheUpdateRequest) returns (CacheUpdateResponse);
 }
@@ -44,6 +45,16 @@ message CacheGetMRRequest {
 message CacheGetMRResponse {
     float mr = 1;
     bool success = 2;
+}
+
+message CacheGetFreshnessStatsRequest {
+
+}
+
+message CacheGetFreshnessStatsResponse {
+    int32 num_invalidates = 1;
+    int32 num_updates = 2;
+    bool success = 3;
 }
 
 message CacheInvalidateRequest {

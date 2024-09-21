@@ -9,9 +9,6 @@ find_package(Threads)
 set(SOURCES
     src/policy.hpp
     src/policy.cpp
-    src/cache_client.cpp
-    src/db_client.cpp
-    src/client.cpp
     src/client.hpp
     include/tqdm.hpp
     include/zipf.hpp
@@ -26,7 +23,6 @@ include_directories(
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
-
 
 #
 # Target

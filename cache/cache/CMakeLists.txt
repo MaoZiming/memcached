@@ -18,9 +18,6 @@ set(SOURCES
 
 set(HEADERS
     ${CMAKE_SOURCE_DIR}/client/src/client.hpp
-    ${CMAKE_SOURCE_DIR}/client/src/db_client.cpp
-    ${CMAKE_SOURCE_DIR}/client/src/cache_client.cpp
-    ${CMAKE_SOURCE_DIR}/client/src/policy.cpp
     ${CMAKE_SOURCE_DIR}/client/src/policy.hpp
 )
 

@@ -6,7 +6,10 @@ service DBService {
   rpc Put (DBPutRequest) returns (DBPutResponse);
   rpc Get (DBGetRequest) returns (DBGetResponse);
   rpc Delete (DBDeleteRequest) returns (DBDeleteResponse);
-  rpc GetLoad(DBGetLoadRequest) returns (DBGetLoadResponse);
+  rpc GetLoad(DBGetLoadRequest) returns (DBGetLoadResponse); 
+  rpc GetReadCount(DBGetReadCountRequest) returns (DBGetReadCountResponse);
+  rpc GetWriteCount(DBGetWriteCountRequest) returns (DBGetWriteCountResponse);
+  rpc StartRecord(DBStartRecordRequest) returns (DBStartRecordResponse);
 }
 
 message DBPutRequest {
@@ -42,5 +45,27 @@ message DBGetLoadRequest {
 
 message DBGetLoadResponse {
   int32 load = 1;
+  bool success = 2;
+}
+
+message DBStartRecordRequest {
+
+}
+
+message DBStartRecordResponse {
+  bool success = 1;
+}
+
+message DBGetReadCountRequest {}
+
+message DBGetReadCountResponse {
+  int64 read_count = 1;
+  bool success = 2;
+}
+
+message DBGetWriteCountRequest {}
+
+message DBGetWriteCountResponse {
+  int64 write_count = 1;
   bool success = 2;
 }
