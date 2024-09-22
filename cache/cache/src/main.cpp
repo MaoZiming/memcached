@@ -67,7 +67,7 @@ public:
 
     void Run()
     {
-        std::string server_address("10.128.0.34:50051");
+        std::string server_address("10.128.0.38:50051");
 
         ServerBuilder builder;
         builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());

@@ -29,7 +29,7 @@ const int C_M = C_I + C_U;
         }                                      \
     } while (false)
 
-const std::string CACHE_ADDR = "10.128.0.34:50051";
+const std::string CACHE_ADDR = "10.128.0.38:50051";
 const std::string DB_ADDR = "10.128.0.33:50051";
 
 // If we do async.

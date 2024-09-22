@@ -517,7 +517,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Meta/data";
-    int num_operations_ = 500000;
+    int num_operations_ = 500000 * 3;
 };
 
 class TwitterWorkload : public Workload
@@ -629,7 +629,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Twitter/2020Mar";
-    int num_operations_ = 1000000;
+    int num_operations_ = 1000000 * 3;
 };
 
 class IBMWorkload : public Workload
@@ -706,7 +706,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/IBM/data";
-    int num_operations_ = 100000;
+    int num_operations_ = 100000 * 3;
 };
 
 class TencentWorkload : public Workload
@@ -772,7 +772,7 @@ private:
         }
     }
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Tencent/cbs_trace1/atc_2020_trace/trace_ori";
-    int num_operations_ = 100000; // Limit number of operations to process
+    int num_operations_ = 100000 * 3; // Limit number of operations to process
 };
 
 class AlibabaWorkload : public Workload
@@ -839,7 +839,7 @@ private:
     }
 
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Alibaba/alibaba_block_traces_2020/io_traces.csv";
-    int num_operations_ = 100000;
+    int num_operations_ = 100000 * 3;
 };
 
 class WikiCDNWorkload : public Workload
