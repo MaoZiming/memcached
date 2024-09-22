@@ -15,13 +15,7 @@
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2)
-    {
-        std::cerr << "Usage: " << argv[0] << " <workload>" << std::endl;
-        return 1;
-    }
-
-    std::string workload = argv[1]; // Capture workload string from the command line
+    Parser parser(argc, argv);
 
     // Create a channel to connect to the server
     Client client(grpc::CreateChannel(CACHE_ADDR,
@@ -35,7 +29,7 @@ int main(int argc, char *argv[])
     // alpha = 1.0;
 
     // Pass the workload string to the benchmark function
-    benchmark(client, ttl, ew, workload, NUM_CPUS);
+    benchmark(client, ttl, ew, parser, NUM_CPUS);
 
     return 0;
 }

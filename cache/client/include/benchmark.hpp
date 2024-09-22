@@ -14,6 +14,7 @@
 #include "zipf.hpp"
 #include "tqdm.hpp"
 #include "workload.hpp"
+#include "parser.hpp"
 
 const int C_I = 10;
 const int C_U = 46;
@@ -29,13 +30,14 @@ const int C_M = C_I + C_U;
         }                                      \
     } while (false)
 
-const std::string CACHE_ADDR = "10.128.0.34:50051";
+const std::string CACHE_ADDR = "10.128.0.38:50051";
 const std::string DB_ADDR = "10.128.0.33:50051";
+int warmup_factor = 5;
 
 // If we do async.
 const int NUM_CPUS = 4;
 
-void _warm_thread(Client &client, int start, int end, int ttl, float ew, Workload *workload)
+void _warm_thread_db(Client &client, int start, int end, int ttl, float ew, Workload *workload)
 {
     int idx = 0;
     // for (const auto &[key, value_size] : tq::tqdm(workload->keys_to_val_size))
@@ -48,7 +50,17 @@ void _warm_thread(Client &client, int start, int end, int ttl, float ew, Workloa
         }
         idx += 1;
         client.SetWarm(key, workload->get_value_from_size(value_size), ttl); // Disable invalidate
-        client.SetCache(key, workload->get_value_from_size(value_size), ttl);
+    }
+}
+
+void _warm_thread_cache(Client &client, int start, int end, int ttl, float ew, Workload *workload)
+{
+    // for (const auto &[key, value_size] : tq::tqdm(workload->keys_to_val_size))
+    for (int i = start; i < end; i++)
+    {
+        std::string key = workload->get_key(i);
+        std::string value = workload->get_value(i);
+        client.SetCache(key, value, ttl); // Need to set for both raeds and writes.
     }
 }
 
@@ -61,7 +73,24 @@ void _warm(Client &client, int ttl, float ew, Workload *workload)
     {
         int start = t * operations_per_thread;
         int end = (t == num_threads - 1) ? workload->keys_to_val_size.size() : (t + 1) * operations_per_thread;
-        threads.emplace_back(_warm_thread, std::ref(client), start, end, ttl, ew, workload);
+        threads.emplace_back(_warm_thread_db, std::ref(client), start, end, ttl, ew, workload);
+    }
+    // Join all threads
+    for (auto &thread : threads)
+    {
+        thread.join();
+    }
+    threads.clear();
+
+    /* Provide a short warming of cache. */
+
+    int num_warmup_operations = workload->num_operations() / warmup_factor;
+    operations_per_thread = num_warmup_operations / num_threads;
+    for (int t = 0; t < num_threads; ++t)
+    {
+        int start = t * operations_per_thread;
+        int end = (t == num_threads - 1) ? num_warmup_operations : (t + 1) * operations_per_thread;
+        threads.emplace_back(_warm_thread_cache, std::ref(client), start, end, ttl, ew, workload);
     }
     // Join all threads
     for (auto &thread : threads)
@@ -141,52 +170,10 @@ void benchmark_ew_tracker(Tracker *tracker, Workload *workload)
     std::cout << "gold_tracker storage: " << gold_tracker->get_storage_overhead() << std::endl;
 }
 
-void benchmark(Client &client, int ttl, float ew, std::string workload_str = "Poisson", int num_threads = 1, bool skip_exp = false)
+void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_threads = 1, bool skip_exp = false)
 {
-    Workload *workload;
+    Workload *workload = parser.workload;
 
-    if (workload_str == "Poisson")
-    {
-        workload = new PoissonWorkload();
-    }
-    else if (workload_str == "Meta")
-    {
-        workload = new MetaWorkload();
-    }
-    else if (workload_str == "PoissonMix")
-    {
-        workload = new PoissonMixWorkload();
-    }
-    else if (workload_str == "PoissonWrite")
-    {
-        workload = new PoissonWriteWorkload();
-    }
-    else if (workload_str == "Twitter")
-    {
-        workload = new TwitterWorkload();
-    }
-    else if (workload_str == "Tencent")
-    {
-        workload = new TencentWorkload();
-    }
-    else if (workload_str == "IBM")
-    {
-        workload = new IBMWorkload();
-    }
-    else if (workload_str == "Alibaba")
-    {
-        workload = new AlibabaWorkload();
-    }
-    else if (workload_str == "WikiCDN")
-    {
-        ASSERT(false, "WikiCDN trace has No write");
-        workload = new WikiCDNWorkload();
-    }
-    else
-    {
-        std::cerr << "Unrecognized workload: " << workload_str << std::endl;
-        return;
-    }
     if (skip_exp && client.get_tracker())
     {
         benchmark_ew_tracker(client.get_tracker(), workload);
@@ -195,7 +182,7 @@ void benchmark(Client &client, int ttl, float ew, std::string workload_str = "Po
     if (skip_exp)
         return;
 
-    workload->init();
+    workload->init(parser.scale_factor);
 
     client.SetTTL(ttl);
     std::cout << "Begin Warming: " << std::endl;
@@ -207,12 +194,15 @@ void benchmark(Client &client, int ttl, float ew, std::string workload_str = "Po
     client.StartRecord();
     std::cout << "\nBegin Benchmarking: " << std::endl;
     std::vector<std::thread> threads;
-    int operations_per_thread = workload->num_operations() / num_threads;
+    int num_warmup_operations = workload->num_operations() / warmup_factor;
+    int num_operations = workload->num_operations() - num_warmup_operations;
+
+    int operations_per_thread = num_operations / num_threads;
 
     for (int t = 0; t < num_threads; ++t)
     {
-        int start_op = t * operations_per_thread;
-        int end_op = (t == num_threads - 1) ? workload->num_operations() : start_op + operations_per_thread;
+        int start_op = t * operations_per_thread + num_warmup_operations;
+        int end_op = (t == num_threads - 1) ? num_operations : start_op + operations_per_thread;
         threads.emplace_back(benchmark_thread_async, std::ref(client), start_op, end_op, ttl, ew, workload);
     }
 
