@@ -42,6 +42,6 @@ git clone https://github.com/MaoZiming/libmemcached.git
 cd libmemcached
 mkdir build-libmemcached
 cd $_
-cmake ../libmemcached
+cmake ..
 make
 sudo make install

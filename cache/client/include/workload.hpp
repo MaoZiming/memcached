@@ -41,8 +41,11 @@ class Workload
 public:
     Workload() = default;
 
-    void init()
+    void init(int scale_factor)
     {
+        if (scale_factor != -1)
+            scale_factor_ = scale_factor;
+        std::cerr << "Generate requests: " << scale_factor_ << std::endl;
         generateRequests(); // Calls the derived class's generateRequests method
         report_stats();
     }
@@ -261,7 +264,7 @@ public:
 
     int get_value_size(int value_size)
     {
-        return std::max(0, std::min(1000000, value_size));
+        return std::max(1, std::min(1000000, value_size));
     }
 
     int num_distinct_keys = -1;
@@ -745,7 +748,7 @@ private:
                     lba = token;
 
                     std::getline(ss, token, ','); // size (multiplied by 512)
-                    size = std::stoi(token) * 512;
+                    size = std::stoi(token) * 1012;
 
                     std::getline(ss, token, ','); // is_write (0 for read, 1 for write)
                     is_write = std::stoi(token);

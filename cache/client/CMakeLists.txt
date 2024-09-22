@@ -14,6 +14,7 @@ set(SOURCES
     include/zipf.hpp
     include/benchmark.hpp
     include/workload.hpp
+    include/parser.hpp
 )
 
 include_directories(
