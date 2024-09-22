@@ -310,7 +310,7 @@ private:
             num_operations_ = num_ops;
         // Same seed.
         std::default_random_engine generator(0);
-        std::exponential_distribution<double> distribution(lambda);
+        std::exponential_distribution<double> distribution(lambda * scale_factor_);
         std::vector<std::string> keys(num_keys);
         std::vector<int> distribution_values;
         if (alpha > 1.0)
@@ -360,7 +360,7 @@ class PoissonMixWorkload : public PoissonWorkload
             num_operations_ = num_ops;
         // Same seed.
         std::default_random_engine generator(0);
-        std::exponential_distribution<double> distribution(lambda);
+        std::exponential_distribution<double> distribution(lambda * scale_factor_);
         std::vector<std::string> keys(num_keys);
         std::vector<int> distribution_values;
         if (alpha > 1.0)
@@ -420,7 +420,7 @@ private:
             num_operations_ = num_ops;
         // Same seed.
         std::default_random_engine generator(0);
-        std::exponential_distribution<double> distribution(lambda);
+        std::exponential_distribution<double> distribution(lambda * scale_factor_);
         std::vector<std::string> keys(num_keys);
         std::vector<int> distribution_values;
         if (alpha > 1.0)

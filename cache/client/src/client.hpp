@@ -187,7 +187,7 @@ public:
         memcached_pool_push(pool, memc);
     }
 
-    std::future<bool> AsyncFill(const std::string &key, memcached_pool_st *pool, int ttl)
+    std::future<std::string> AsyncFill(const std::string &key, memcached_pool_st *pool, int ttl)
     {
         {
             std::unique_lock<std::mutex> lock(mutex_);
@@ -197,8 +197,8 @@ public:
         }
 
         // Create a promise and return a future associated with it
-        auto promise = std::make_shared<std::promise<bool>>();
-        std::future<bool> result_future = promise->get_future();
+        auto promise = std::make_shared<std::promise<std::string>>();
+        std::future<std::string> result_future = promise->get_future();
 
         // Launch an async task to query the DB and fill the cache when done
         std::thread([this, key, pool, ttl, promise]()
@@ -217,7 +217,7 @@ public:
                                 std::cerr << "Miss finished: " << key << std::endl;
 #endif
                                 // Fulfill the promise with success
-                                promise->set_value(true);
+                                promise->set_value(db_value);
                             }
                             else
                             {

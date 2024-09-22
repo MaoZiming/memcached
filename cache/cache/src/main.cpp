@@ -194,10 +194,41 @@ private:
 #ifdef DEBUG
                 std::cerr << "Miss: " << request_.key() << std::endl;
 #endif
+
+                /* Do not wait to finish */
+
                 impl_->cache_miss_++;
-                impl_->db_client_.AsyncFill(request_.key(), impl_->pool, impl_->ttl_);
-                response_.set_value(std::string("Later"));
-                response_.set_success(true);
+                if (false)
+                {
+
+                    impl_->db_client_.AsyncFill(request_.key(), impl_->pool, impl_->ttl_);
+                    response_.set_value(std::string("Later"));
+                    response_.set_success(true);
+                }
+                else
+                {
+                    // Call AsyncFill and get the future
+
+                    std::cout << "Start miss: " << request_.key() << std::endl;
+                    std::future<std::string> fill_future = impl_->db_client_.AsyncFill(request_.key(), impl_->pool, impl_->ttl_);
+
+                    // Wait for the AsyncFill operation to finish
+                    try
+                    {
+                        // You can use wait() if you don't care about the result, or get() to retrieve the result.
+                        std::string value = fill_future.get(); // This blocks until the async operation is done
+                        response_.set_value(value);
+                        response_.set_success(true);
+                    }
+                    catch (const std::exception &e)
+                    {
+                        // Handle any exceptions thrown during the async operation
+                        std::cerr << "Exception occurred: " << e.what() << std::endl;
+                        response_.set_value(std::string("Error during AsyncFill"));
+                        response_.set_success(false);
+                    }
+                    std::cout << "Finish miss:  " << request_.key() << std::endl;
+                }
             }
             impl_->free_mc(memc);
         }

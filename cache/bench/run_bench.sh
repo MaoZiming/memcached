@@ -30,6 +30,7 @@ DB_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$DB_VM_IP"
 CACHE_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$CACHE_VM_IP"
 BENCHMARKS=("adaptive_bench" "invalidate_bench"  "update_bench" "ttl_bench" "stale_bench")
 DATASETS=("IBM" "Meta" "Twitter" "Alibaba" "Tencent")
+DATASETS=("Poisson" "PoissonMix"  "PoissonWrite")
 
 cd /home/maoziming/memcached/cache/build/
 make -j
