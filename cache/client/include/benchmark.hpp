@@ -187,7 +187,7 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
 
     client.SetTTL(ttl);
     std::cout << "Begin Warming: " << std::endl;
-    // _warm(client, ttl, ew, workload);
+    _warm(client, ttl, ew, workload);
 
     std::cout << "Warming done. Sleep for 10 seconds: " << std::endl;
     std::this_thread::sleep_for(std::chrono::seconds(10)); // Sleep for 10 seconds
@@ -239,13 +239,13 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
     std::cout << "End-to-End Latency: " << duration << " ms" << std::endl;
 
     std::cout << "Average cache latency: " << client.GetCacheAverageLatency() / 1000 << " ms" << std::endl;
-    std::cout << "Average DB latency: " << client.GetDBAverageLatency() / 1000 << " ms" << std::endl;
+    // std::cout << "Average DB latency: " << client.GetDBAverageLatency() / 1000 << " ms" << std::endl;
 
     std::string latency_message = "Average cache latency: " + std::to_string(client.GetCacheAverageLatency() / 1000.0) + " ms";
     WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
 
-    latency_message = "Average DB latency: " + std::to_string(client.GetDBAverageLatency() / 1000.0) + " ms";
-    WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
+    // latency_message = "Average DB latency: " + std::to_string(client.GetDBAverageLatency() / 1000.0) + " ms";
+    // WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
 
     latency_message = "End-to-End Latency: " + std::to_string(duration) + " ms";
     WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
