@@ -14,7 +14,7 @@
 #include <libmemcached/memcached.h>
 #include <libmemcached/util.h>
 #include <condition_variable>
-#include <mutex>
+// #include <mutex>
 #include <future>
 #define ASSERT(condition, message)             \
     do                                         \

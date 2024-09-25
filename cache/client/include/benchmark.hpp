@@ -187,7 +187,7 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
 
     client.SetTTL(ttl);
     std::cout << "Begin Warming: " << std::endl;
-    // _warm(client, ttl, ew, workload);
+    _warm(client, ttl, ew, workload);
 
     std::cout << "Warming done. Sleep for 10 seconds: " << std::endl;
     std::this_thread::sleep_for(std::chrono::seconds(10)); // Sleep for 10 seconds
