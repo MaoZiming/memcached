@@ -15,7 +15,7 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
-#include <cassert> // For assert()
+#include <cassert>
 
 using grpc::Server;
 using grpc::ServerAsyncResponseWriter;
@@ -194,9 +194,7 @@ private:
 #ifdef DEBUG
                 std::cerr << "Miss: " << request_.key() << std::endl;
 #endif
-
                 /* Do not wait to finish */
-
                 impl_->cache_miss_++;
                 if (false)
                 {

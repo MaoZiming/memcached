@@ -74,10 +74,10 @@ const int UPDATE_EW = -4;
 
 // #define USE_RPC_LIMIT
 
-#ifdef USE_RPC_LIMIT
-const int MAX_CONCURRENT_RPCS = 70000;
-const int MAX_DB_CONCURRENT_RPCS = 100;
-#endif
+// #ifdef USE_RPC_LIMIT
+// const int MAX_CONCURRENT_RPCS = 70000;
+// const int MAX_DB_CONCURRENT_RPCS = 100;
+// #endif
 
 class DBClient
 {
@@ -98,15 +98,12 @@ public:
     std::future<std::string> AsyncGet(const std::string &key)
     {
         // std::cout << "AsyncGet starts" << std::endl;
-        std::cout << "current_rpcs: " << current_rpcs.load() << std::endl;
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_DB_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        // std::unique_lock<std::mutex> lock(mutex_);
+        // cv_.wait(lock, [this]()
+        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        ++current_rpcs;
+        // }
 
         // Build the request
         DBGetRequest request;
@@ -117,7 +114,6 @@ public:
         call->call_type = AsyncClientCall::CallType::GET;
         call->key = key;
         call->get_promise = std::make_shared<std::promise<std::string>>();
-        call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<std::string> result_future = call->get_promise->get_future();
@@ -232,7 +228,7 @@ public:
         //     std::unique_lock<std::mutex> lock(mutex_);
         //     cv_.wait(lock, [this]()
         //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        //     ++current_rpcs;
+        ++current_rpcs;
         // }
 
         // Create a promise and return a future associated with it
@@ -284,14 +280,12 @@ public:
 
     std::future<bool> AsyncPut(const std::string &key, const std::string &value, float ew)
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_DB_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        //     std::unique_lock<std::mutex> lock(mutex_);
+        //     cv_.wait(lock, [this]()
+        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        ++current_rpcs;
+        // }
 
         // Build the request
         DBPutRequest request;
@@ -313,7 +307,6 @@ public:
         call->call_type = AsyncClientCall::CallType::PUT;
         call->key = key;
         call->put_promise = std::make_shared<std::promise<bool>>();
-        call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<bool> result_future = call->put_promise->get_future();
@@ -351,14 +344,12 @@ public:
     // Modified Delete method using Async pattern
     std::future<bool> AsyncDelete(const std::string &key)
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_DB_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        //     std::unique_lock<std::mutex> lock(mutex_);
+        //     cv_.wait(lock, [this]()
+        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        ++current_rpcs;
+        // }
 
         // Build the request
         DBDeleteRequest request;
@@ -369,7 +360,6 @@ public:
         call->call_type = AsyncClientCall::CallType::DELETE;
         call->key = key;
         call->delete_promise = std::make_shared<std::promise<bool>>();
-        call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<bool> result_future = call->delete_promise->get_future();
@@ -401,14 +391,12 @@ public:
     // Asynchronous GetLoad method returning a future
     std::future<int> AsyncGetLoad()
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_DB_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        //     std::unique_lock<std::mutex> lock(mutex_);
+        //     cv_.wait(lock, [this]()
+        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        ++current_rpcs;
+        // }
 
         // Build the request
         DBGetLoadRequest request;
@@ -417,7 +405,6 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::GETLOAD;
         call->load_promise = std::make_shared<std::promise<int>>();
-        call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<int> result_future = call->load_promise->get_future();
@@ -449,14 +436,12 @@ public:
     // Asynchronous StartRecord method returning a future
     std::future<bool> AsyncStartRecord()
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_DB_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        //     std::unique_lock<std::mutex> lock(mutex_);
+        //     cv_.wait(lock, [this]()
+        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        ++current_rpcs;
+        // }
 
         // Build the request
         DBStartRecordRequest request;
@@ -467,7 +452,6 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::STARTRECORD;
         call->start_record_promise = std::make_shared<std::promise<bool>>();
-        call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<bool> result_future = call->start_record_promise->get_future();
@@ -499,14 +483,12 @@ public:
     // Asynchronous GetDBReadCount method returning a future
     std::future<int> AsyncGetDBReadCount()
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        //     std::unique_lock<std::mutex> lock(mutex_);
+        //     cv_.wait(lock, [this]()
+        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        ++current_rpcs;
+        // }
 
         // Build the request
         DBGetReadCountRequest request;
@@ -515,7 +497,6 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::GETREADCOUNT;
         call->read_count_promise = std::make_shared<std::promise<int>>();
-        call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<int> result_future = call->read_count_promise->get_future();
@@ -547,14 +528,12 @@ public:
     // Asynchronous GetDBWriteCount method returning a future
     std::future<int> AsyncGetDBWriteCount()
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_DB_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        //     std::unique_lock<std::mutex> lock(mutex_);
+        //     cv_.wait(lock, [this]()
+        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        ++current_rpcs;
+        // }
 
         // Build the request
         DBGetWriteCountRequest request;
@@ -563,7 +542,6 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::GETWRITECOUNT;
         call->write_count_promise = std::make_shared<std::promise<int>>();
-        call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<int> result_future = call->write_count_promise->get_future();
@@ -597,40 +575,12 @@ public:
         tracker_ = tracker;
     }
 
-    int get_current_rpcs() { return current_rpcs.load(); }
-
-    // Function to calculate average latency
-    double GetAverageLatency()
-    {
-        std::lock_guard<std::mutex> lock(latency_mutex_);
-
-        if (latencies_.empty())
-        {
-            return 0.0; // Avoid division by zero
-        }
-
-        long total_latency = 0;
-        for (const auto &latency : latencies_)
-        {
-            total_latency += latency;
-        }
-
-        return static_cast<double>(total_latency) / latencies_.size();
-    }
-
 private:
     std::unique_ptr<DBService::Stub> stub_;
     Tracker *tracker_ = nullptr;
-
-    // Latency tracking
-    std::vector<long> latencies_; // To store latencies in microseconds
-    std::mutex latency_mutex_;    // Protects access to the latency vector
-
-#ifdef USE_RPC_LIMIT
-    std::mutex mutex_;
+    // std::mutex mutex_;
     std::condition_variable cv_;
-#endif
-    std::atomic<int> current_rpcs{0};
+    int current_rpcs = 0;
 
     grpc::CompletionQueue cq_;
     std::thread cq_thread_;
@@ -687,8 +637,6 @@ private:
 
         grpc::ClientContext context;
         grpc::Status status;
-
-        std::chrono::steady_clock::time_point start_time;
     };
 
     void AsyncCompleteRpc()
@@ -702,16 +650,6 @@ private:
 
             if (call->status.ok())
             {
-
-                auto end_time = std::chrono::steady_clock::now();
-                auto latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - call->start_time).count();
-
-                // Add latency to the vector (protected by a mutex)
-                {
-                    std::lock_guard<std::mutex> lock(latency_mutex_);
-                    latencies_.push_back(latency);
-                }
-
                 switch (call->call_type)
                 {
                 case AsyncClientCall::CallType::GET:
@@ -785,16 +723,11 @@ private:
             }
 
             // Decrement current_rpcs and notify
-            {
-#ifdef USE_RPC_LIMIT
-                std::lock_guard<std::mutex> lock(mutex_);
-#endif
-                --current_rpcs;
-            }
-
-#ifdef USE_RPC_LIMIT
-            cv_.notify_one();
-#endif
+            // {
+            // std::lock_guard<std::mutex> lock(mutex_);
+            --current_rpcs;
+            // }
+            // cv_.notify_one();
 
             delete call;
         }
@@ -830,14 +763,14 @@ public:
     std::future<std::string> GetAsync(const std::string &key)
     {
         // std::cout << "Start AsyncGet: " << key << std::endl;
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        // #ifdef USE_RPC_LIMIT
+        // std::unique_lock<std::mutex> lock(mutex_);
+        // cv_.wait(lock, [this]()
+        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        // #endif
+        ++current_rpcs;
+        // }
 
         // Build the request
         CacheGetRequest request;
@@ -865,14 +798,14 @@ public:
     // Asynchronous Set method returning a future
     std::future<bool> SetAsync(const std::string &key, const std::string &value, int ttl)
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        // #ifdef USE_RPC_LIMIT
+        // std::unique_lock<std::mutex> lock(mutex_);
+        // cv_.wait(lock, [this]()
+        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        // #endif
+        ++current_rpcs;
+        // }
 
         // Build the request
         CacheSetRequest request;
@@ -900,14 +833,14 @@ public:
     // Asynchronous Invalidate method returning a future
     std::future<bool> InvalidateAsync(const std::string &key)
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        // #ifdef USE_RPC_LIMIT
+        // std::unique_lock<std::mutex> lock(mutex_);
+        // cv_.wait(lock, [this]()
+        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        // #endif
+        ++current_rpcs;
+        // }
 
         // Build the request
         CacheInvalidateRequest request;
@@ -933,14 +866,14 @@ public:
     // Asynchronous Update method returning a future
     std::future<bool> UpdateAsync(const std::string &key, const std::string &value, int ttl)
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        // #ifdef USE_RPC_LIMIT
+        // std::unique_lock<std::mutex> lock(mutex_);
+        // cv_.wait(lock, [this]()
+        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        // #endif
+        ++current_rpcs;
+        // }
 
         // Build the request
         CacheUpdateRequest request;
@@ -967,14 +900,14 @@ public:
     // Asynchronous SetTTL method returning a future
     std::future<bool> SetTTLAsync(int32_t ttl)
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        // #ifdef USE_RPC_LIMIT
+        // std::unique_lock<std::mutex> lock(mutex_);
+        // cv_.wait(lock, [this]()
+        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        // #endif
+        ++current_rpcs;
+        // }
 
         // Build the request
         CacheSetTTLRequest request;
@@ -999,14 +932,14 @@ public:
     // Asynchronous GetMR method returning a future
     std::future<float> GetMRAsync()
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        // #ifdef USE_RPC_LIMIT
+        // std::unique_lock<std::mutex> lock(mutex_);
+        // cv_.wait(lock, [this]()
+        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        // #endif
+        ++current_rpcs;
+        // }
 
         // Build the request
         CacheGetMRRequest request;
@@ -1029,14 +962,14 @@ public:
 
     std::future<std::tuple<int, int>> GetFreshnessStatsAsync()
     {
-        {
-#ifdef USE_RPC_LIMIT
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this]()
-                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
-#endif
-            ++current_rpcs;
-        }
+        // {
+        // #ifdef USE_RPC_LIMIT
+        // std::unique_lock<std::mutex> lock(mutex_);
+        // cv_.wait(lock, [this]()
+        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
+        // #endif
+        ++current_rpcs;
+        // }
 
         // Build the request
         CacheGetFreshnessStatsRequest request;
@@ -1198,6 +1131,8 @@ private:
     // Latency tracking
     std::vector<long> latencies_; // To store latencies in microseconds
     std::mutex latency_mutex_;    // Protects access to the latency vector
+    std::mutex mutex_;
+    std::condition_variable cv_;
 
     std::thread task_processing_thread_;
     struct AsyncClientCall
@@ -1576,10 +1511,10 @@ public:
         return cache_client_->GetAverageLatency();
     }
 
-    double GetDBAverageLatency(void)
-    {
-        return db_client_->GetAverageLatency();
-    }
+    // double GetDBAverageLatency(void)
+    // {
+    //     return db_client_->GetAverageLatency();
+    // }
 
 private:
     DBClient *db_client_;
