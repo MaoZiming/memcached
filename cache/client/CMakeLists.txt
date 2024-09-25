@@ -10,6 +10,8 @@ set(SOURCES
     src/policy.hpp
     src/policy.cpp
     src/client.hpp
+    src/load_tracker.cpp
+    src/load_tracker.hpp
     include/tqdm.hpp
     include/zipf.hpp
     include/benchmark.hpp

@@ -67,7 +67,7 @@ public:
 
     void Run()
     {
-        std::string server_address("10.128.0.38:50051");
+        std::string server_address("10.128.0.39:50051");
 
         ServerBuilder builder;
         builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -201,7 +201,7 @@ private:
                 if (false)
                 {
 
-                    impl_->db_client_.AsyncFill(request_.key(), impl_->pool, impl_->ttl_);
+                    impl_->db_client_.AsyncFill(request_.key(), impl_->ttl_);
                     response_.set_value(std::string("Later"));
                     response_.set_success(true);
                 }
@@ -209,14 +209,18 @@ private:
                 {
                     // Call AsyncFill and get the future
 
-                    std::cout << "Start miss: " << request_.key() << std::endl;
-                    std::future<std::string> fill_future = impl_->db_client_.AsyncFill(request_.key(), impl_->pool, impl_->ttl_);
+                    // std::cout << "Start miss: " << request_.key() << std::endl;
+                    std::future<std::string> fill_future = impl_->db_client_.AsyncFill(request_.key(), impl_->ttl_);
 
                     // Wait for the AsyncFill operation to finish
                     try
                     {
                         // You can use wait() if you don't care about the result, or get() to retrieve the result.
                         std::string value = fill_future.get(); // This blocks until the async operation is done
+
+                        // Store the value in Memcached
+                        memcached_set(memc, request_.key().c_str(), request_.key().size(), value.c_str(), value.size(), (time_t)impl_->ttl_, (uint32_t)0);
+
                         response_.set_value(value);
                         response_.set_success(true);
                     }
@@ -227,7 +231,7 @@ private:
                         response_.set_value(std::string("Error during AsyncFill"));
                         response_.set_success(false);
                     }
-                    std::cout << "Finish miss:  " << request_.key() << std::endl;
+                    // std::cout << "Finish miss:  " << request_.key() << std::endl;
                 }
             }
             impl_->free_mc(memc);
@@ -388,7 +392,7 @@ private:
             if (result == MEMCACHED_NOTFOUND)
             {
                 // The key does not exist in the cache
-                std::cout << "Key: " << request_.key() << "is not in cache!" << std::endl;
+                std::cerr << "Key: " << request_.key() << "is not in cache!" << std::endl;
             }
             response_.set_success(result == MEMCACHED_SUCCESS);
             // std::cout << "Update: " << request_.key() << std::endl;

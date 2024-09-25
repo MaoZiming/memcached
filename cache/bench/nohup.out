@@ -1,0 +1,25 @@
+[ 25%] Built target myproto
+[ 37%] Building CXX object client/CMakeFiles/sketches.dir/bench/sketches.cpp.o
+[ 37%] Building CXX object client/CMakeFiles/update_bench.dir/bench/update.cpp.o
+[ 37%] Building CXX object client/CMakeFiles/ttl_bench.dir/bench/ttl.cpp.o
+[ 42%] Built target client
+[ 48%] Building CXX object client/CMakeFiles/invalidate_bench.dir/bench/invalidate.cpp.o
+[ 48%] Building CXX object client/CMakeFiles/adaptive_bench.dir/bench/adaptive.cpp.o
+[ 54%] Built target server
+[ 57%] Building CXX object client/CMakeFiles/dataset.dir/bench/dataset.cpp.o
+[ 60%] Building CXX object client/CMakeFiles/stale_bench.dir/bench/stale.cpp.o
+make[2]: *** [client/CMakeFiles/update_bench.dir/build.make:76: client/CMakeFiles/update_bench.dir/bench/update.cpp.o] Interrupt
+make[2]: *** [client/CMakeFiles/sketches.dir/build.make:76: client/CMakeFiles/sketches.dir/bench/sketches.cpp.o] Interrupt
+make[2]: *** [client/CMakeFiles/invalidate_bench.dir/build.make:76: client/CMakeFiles/invalidate_bench.dir/bench/invalidate.cpp.o] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:278: client/CMakeFiles/update_bench.dir/all] Interrupt
+make[2]: *** [client/CMakeFiles/adaptive_bench.dir/build.make:76: client/CMakeFiles/adaptive_bench.dir/bench/adaptive.cpp.o] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:382: client/CMakeFiles/sketches.dir/all] Interrupt
+make[2]: *** [client/CMakeFiles/dataset.dir/build.make:76: client/CMakeFiles/dataset.dir/bench/dataset.cpp.o] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:252: client/CMakeFiles/invalidate_bench.dir/all] Interrupt
+make[2]: *** [client/CMakeFiles/stale_bench.dir/build.make:76: client/CMakeFiles/stale_bench.dir/bench/stale.cpp.o] Interrupt
+make[2]: *** [client/CMakeFiles/ttl_bench.dir/build.make:76: client/CMakeFiles/ttl_bench.dir/bench/ttl.cpp.o] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:304: client/CMakeFiles/adaptive_bench.dir/all] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:226: client/CMakeFiles/ttl_bench.dir/all] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:330: client/CMakeFiles/stale_bench.dir/all] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:356: client/CMakeFiles/dataset.dir/all] Interrupt
+make: *** [Makefile:91: all] Interrupt

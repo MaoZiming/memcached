@@ -45,7 +45,6 @@ public:
     {
         if (scale_factor != -1)
             scale_factor_ = scale_factor;
-        std::cerr << "Generate requests: " << scale_factor_ << std::endl;
         generateRequests(); // Calls the derived class's generateRequests method
         report_stats();
     }
@@ -55,7 +54,6 @@ public:
     {
         // num_operations_ = 50000000 / 10;
         num_operations_ = 20000000;
-        std::cerr << "Generate requests" << std::endl;
         generateRequests(num_operations_); // Calls the derived class's generateRequests method
         report_stats();
     }
@@ -297,9 +295,9 @@ protected:
 class PoissonWorkload : public Workload
 {
 public:
-    int num_operations_ = 200000;
-    int num_keys = 10000; // Number of keys
-    double lambda = 50;   // Poisson distribution parameter (average request rate)
+    int num_operations_ = 500000;
+    int num_keys = 10000;               // Number of keys
+    double lambda = 50 * scale_factor_; // Poisson distribution parameter (average request rate)
     double alpha = 1.1;
     int key_size_in_KB = 100;
 
@@ -520,7 +518,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Meta/data";
-    int num_operations_ = 500000 * 3;
+    int num_operations_ = 500000;
 };
 
 class TwitterWorkload : public Workload
@@ -632,7 +630,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Twitter/2020Mar";
-    int num_operations_ = 1000000 * 3;
+    int num_operations_ = 500000;
 };
 
 class IBMWorkload : public Workload
@@ -641,7 +639,7 @@ public:
     IBMWorkload()
     {
         max_interval_ = std::chrono::milliseconds{200};
-        scale_factor_ = 100;
+        scale_factor_ = 200;
     }
 
 private:
@@ -709,7 +707,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/IBM/data";
-    int num_operations_ = 100000 * 3;
+    int num_operations_ = 300000 / 10;
 };
 
 class TencentWorkload : public Workload
@@ -775,7 +773,7 @@ private:
         }
     }
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Tencent/cbs_trace1/atc_2020_trace/trace_ori";
-    int num_operations_ = 100000 * 3; // Limit number of operations to process
+    int num_operations_ = 100000; // Limit number of operations to process
 };
 
 class AlibabaWorkload : public Workload
@@ -842,7 +840,7 @@ private:
     }
 
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Alibaba/alibaba_block_traces_2020/io_traces.csv";
-    int num_operations_ = 100000 * 3;
+    int num_operations_ = 100000;
 };
 
 class WikiCDNWorkload : public Workload

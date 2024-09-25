@@ -22,19 +22,22 @@ public:
     Tracker *tracker;
     Workload *workload;
     int scale_factor;
+    std::string log_path;
 
     // Constructor that takes argc and argv
     Parser(int argc, char *argv[])
     {
         if (argc < 2)
         {
-            std::cerr << "Usage: " << argv[0] << " <workload> [<scale_factor>] [<tracker>]" << std::endl;
+            std::cerr << "Usage: " << argv[0] << " <workload> [<scale_factor>] [<tracker>] [<log_papth>]" << std::endl;
             return;
         }
 
         std::string workload_str = argv[1];
         scale_factor = (argc >= 3) ? std::stoi(argv[2]) : -1;                  // Default scale factor
         std::string tracker_str = (argc >= 4) ? argv[3] : "TopKSketchTracker"; // Default tracker
+
+        log_path = (argc >= 5) ? argv[4] : "test.log";
 
         // Initialize tracker based on input
         if (tracker_str == "EveryKeyTracker")

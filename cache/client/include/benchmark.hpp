@@ -15,6 +15,7 @@
 #include "tqdm.hpp"
 #include "workload.hpp"
 #include "parser.hpp"
+#include "load_tracker.hpp"
 
 const int C_I = 10;
 const int C_U = 46;
@@ -30,7 +31,7 @@ const int C_M = C_I + C_U;
         }                                      \
     } while (false)
 
-const std::string CACHE_ADDR = "10.128.0.38:50051";
+const std::string CACHE_ADDR = "10.128.0.39:50051";
 const std::string DB_ADDR = "10.128.0.33:50051";
 int warmup_factor = 5;
 
@@ -186,7 +187,7 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
 
     client.SetTTL(ttl);
     std::cout << "Begin Warming: " << std::endl;
-    _warm(client, ttl, ew, workload);
+    // _warm(client, ttl, ew, workload);
 
     std::cout << "Warming done. Sleep for 10 seconds: " << std::endl;
     std::this_thread::sleep_for(std::chrono::seconds(10)); // Sleep for 10 seconds
@@ -198,6 +199,10 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
     int num_operations = workload->num_operations() - num_warmup_operations;
 
     int operations_per_thread = num_operations / num_threads;
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    START_COLLECTION(std::string(parser.log_path), client.get_db_client(), client.get_cache_client());
 
     for (int t = 0; t < num_threads; ++t)
     {
@@ -212,6 +217,12 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
         thread.join();
     }
 
+    // End time measurement
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    // Calculate the e2e latency
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+
     float mr = client.GetMR();
     std::tuple<int, int> stats = client.GetFreshnessStats();
     int invalidates = std::get<0>(stats);
@@ -225,4 +236,22 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
     std::cout << "Updates: " << updates << std::endl;
 
     std::cout << "Load: " << load << std::endl;
+    std::cout << "End-to-End Latency: " << duration << " ms" << std::endl;
+
+    std::cout << "Average cache latency: " << client.GetCacheAverageLatency() / 1000 << " ms" << std::endl;
+    std::cout << "Average DB latency: " << client.GetDBAverageLatency() / 1000 << " ms" << std::endl;
+
+    std::string latency_message = "Average cache latency: " + std::to_string(client.GetCacheAverageLatency() / 1000.0) + " ms";
+    WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
+
+    latency_message = "Average DB latency: " + std::to_string(client.GetDBAverageLatency() / 1000.0) + " ms";
+    WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
+
+    latency_message = "End-to-End Latency: " + std::to_string(duration) + " ms";
+    WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
+
+    latency_message = "Num operations: " + std::to_string(num_operations);
+    WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
+
+    END_COLLECTION();
 }

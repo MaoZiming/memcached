@@ -21,17 +21,16 @@ CACHE_VM_SERVER_PATH="/home/maoziming/memcached/cache/build/cache/server"
 CACHE_VM_CLIENT_PATH="/home/maoziming/memcached/cache/build/client"
 DB_VM_USER="maoziming"
 DB_VM_IP="10.128.0.33"
-CACHE_VM_IP="10.128.0.38"
+CACHE_VM_IP="10.128.0.39"
 DB_VM_KEY="/home/maoziming/memcached/cache/key"
 DB_VM_SERVER_PATH="/home/maoziming/rocksdb/backend/build/server/server"
 DB_VM_DB_PATH="/home/maoziming/rocksdb/backend/build/test.db"
 DB_VM_LOG_DIR="/home/maoziming/rocksdb/backend/build/logs"
 DB_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$DB_VM_IP"
 CACHE_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$CACHE_VM_IP"
+DATASETS=("IBM" "Meta" "Twitter" "Alibaba" "Tencent" "PoissonMix" "Poisson" "PoissonWrite")
 BENCHMARKS=("adaptive_bench" "invalidate_bench"  "update_bench" "ttl_bench" "stale_bench")
 DATASETS=("IBM" "Meta" "Twitter" "Alibaba" "Tencent")
-DATASETS=("Poisson" "PoissonMix"  "PoissonWrite")
-
 cd /home/maoziming/memcached/cache/build/
 make -j
 
@@ -64,6 +63,7 @@ for DATASET in "${DATASETS[@]}"; do
         echo "Starting fresh cache server..."
         $CACHE_VM_SSH "sudo pkill server"
         sleep 5
+        $CACHE_VM_SSH "cd /home/maoziming/memcached/cache/build && make -j"
         $CACHE_VM_SSH "$CACHE_VM_SERVER_PATH" &
         if [ $? -ne 0 ]; then
             echo "Error starting cache server for $BENCHMARK with dataset $DATASET"
@@ -102,7 +102,7 @@ for DATASET in "${DATASETS[@]}"; do
         fi
 
         # Step 5: Tear down DB server for this run
-        sleep 5
+            sleep 10
         echo "Tearing down DB server for $BENCHMARK with dataset $DATASET..."
         $DB_VM_SSH "pkill -f '$DB_VM_SERVER_PATH'"
         if [ $? -ne 0 ]; then

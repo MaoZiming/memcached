@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
     Tracker *tracker = new EveryKeyTracker();
 
     // Create a channel to connect to the server
-    Client client(grpc::CreateChannel("10.128.0.38:50051",
+    Client client(grpc::CreateChannel("10.128.0.39:50051",
                                       grpc::InsecureChannelCredentials()),
                   grpc::CreateChannel("10.128.0.33:50051",
                                       grpc::InsecureChannelCredentials()),
