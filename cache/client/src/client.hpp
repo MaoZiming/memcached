@@ -1257,7 +1257,7 @@ private:
                                 }
 
                                 // Optionally log the error
-                                std::cerr << error_message << " for key: " << call->key << std::endl;
+                                // std::cerr << error_message << " for key: " << call->key << std::endl;
 
                                 // Handle RPC failure. Exit immediately.
                                 // exit(-1);

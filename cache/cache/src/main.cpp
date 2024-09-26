@@ -233,6 +233,35 @@ private:
                 response_.set_success(true);
                 free(value); // Free allocated memory
             }
+            else if (true)
+            {
+                impl_->cache_miss_++;
+                std::string key = request_.key();
+                auto ttl = impl_->ttl_;
+                auto impl = impl_;
+                // Start a detached thread to perform AsyncFill
+                std::thread([impl, key, ttl]()
+                            {
+                                std::future<std::string> fill_future = impl->db_client_.AsyncFill(key, ttl);
+                                try
+                                {
+                                    memcached_st *memc_async = impl->create_mc();
+                                    std::string value = fill_future.get();
+                                    memcached_set(memc_async, key.c_str(), key.size(),
+                                                value.c_str(), value.size(), static_cast<time_t>(ttl), 0);
+                                    impl->free_mc(memc_async);
+                                }
+                                catch (const std::exception &e)
+                                {
+                                    std::cerr << "Exception occurred in AsyncFill thread: " << e.what() << std::endl;
+                                    // Optional: Handle the error, e.g., log it or set a default value in memcached
+                                } })
+                    .detach();
+
+                // Set the response to indicate the value will be available later
+                response_.set_value("will be available later");
+                response_.set_success(true);
+            }
             else
             {
                 impl_->cache_miss_++;
