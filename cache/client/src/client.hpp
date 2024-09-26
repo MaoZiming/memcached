@@ -16,6 +16,8 @@
 #include <condition_variable>
 // #include <mutex>
 #include <future>
+#include "thread_pool.hpp"
+
 #define ASSERT(condition, message)             \
     do                                         \
     {                                          \
@@ -94,6 +96,17 @@ public:
         cq_thread_.join();
     }
 
+    DBClient(std::string db_address, int num_connections)
+    {
+        std::cout << "Created " << num_connections << " DBClient stubs" << std::endl;
+        for (int i = 0; i < num_connections; ++i)
+        {
+            auto channel = grpc::CreateChannel(db_address, grpc::InsecureChannelCredentials());
+            stubs_.push_back(DBService::NewStub(channel));
+        }
+        cq_thread_ = std::thread(&DBClient::AsyncCompleteRpc, this);
+    }
+
     // Modified AsyncGet to return a std::future
     std::future<std::string> AsyncGet(const std::string &key)
     {
@@ -114,6 +127,7 @@ public:
         call->call_type = AsyncClientCall::CallType::GET;
         call->key = key;
         call->get_promise = std::make_shared<std::promise<std::string>>();
+        // call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<std::string> result_future = call->get_promise->get_future();
@@ -307,12 +321,12 @@ public:
         call->call_type = AsyncClientCall::CallType::PUT;
         call->key = key;
         call->put_promise = std::make_shared<std::promise<bool>>();
-
+        call->start_time = std::chrono::steady_clock::now();
         // Get the future from the promise
         std::future<bool> result_future = call->put_promise->get_future();
 
         // Start the asynchronous RPC
-        call->put_response_reader = stub_->AsyncPut(&call->context, request, &cq_);
+        call->put_response_reader = get_stub()->AsyncPut(&call->context, request, &cq_);
 
         // Request that, upon completion of the RPC, "call" be updated
         call->put_response_reader->Finish(&call->put_reply, &call->status, (void *)call);
@@ -360,12 +374,12 @@ public:
         call->call_type = AsyncClientCall::CallType::DELETE;
         call->key = key;
         call->delete_promise = std::make_shared<std::promise<bool>>();
-
+        // call->start_time = std::chrono::steady_clock::now();
         // Get the future from the promise
         std::future<bool> result_future = call->delete_promise->get_future();
 
         // Start the asynchronous RPC
-        call->delete_response_reader = stub_->AsyncDelete(&call->context, request, &cq_);
+        call->delete_response_reader = get_stub()->AsyncDelete(&call->context, request, &cq_);
 
         // Request that, upon completion of the RPC, "call" be updated
         call->delete_response_reader->Finish(&call->delete_reply, &call->status, (void *)call);
@@ -410,8 +424,8 @@ public:
         std::future<int> result_future = call->load_promise->get_future();
 
         // Start the asynchronous RPC
-        call->get_load_response_reader = stub_->AsyncGetLoad(&call->context, request, &cq_);
-
+        call->get_load_response_reader = get_stub()->AsyncGetLoad(&call->context, request, &cq_);
+        // call->start_time = std::chrono::steady_clock::now();
         // Request that, upon completion of the RPC, "call" be updated
         call->get_load_response_reader->Finish(&call->get_load_reply, &call->status, (void *)call);
 
@@ -452,12 +466,12 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::STARTRECORD;
         call->start_record_promise = std::make_shared<std::promise<bool>>();
-
+        // call->start_time = std::chrono::steady_clock::now();
         // Get the future from the promise
         std::future<bool> result_future = call->start_record_promise->get_future();
 
         // Start the asynchronous RPC
-        call->start_record_response_reader = stub_->AsyncStartRecord(&call->context, request, &cq_);
+        call->start_record_response_reader = get_stub()->AsyncStartRecord(&call->context, request, &cq_);
 
         // Request that, upon completion of the RPC, "call" be updated
         call->start_record_response_reader->Finish(&call->start_record_reply, &call->status, (void *)call);
@@ -497,12 +511,12 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::GETREADCOUNT;
         call->read_count_promise = std::make_shared<std::promise<int>>();
-
+        // call->start_time = std::chrono::steady_clock::now();
         // Get the future from the promise
         std::future<int> result_future = call->read_count_promise->get_future();
 
         // Start the asynchronous RPC
-        call->get_read_count_response_reader = stub_->AsyncGetReadCount(&call->context, request, &cq_);
+        call->get_read_count_response_reader = get_stub()->AsyncGetReadCount(&call->context, request, &cq_);
 
         // Request that, upon completion of the RPC, "call" be updated
         call->get_read_count_response_reader->Finish(&call->get_read_count_reply, &call->status, (void *)call);
@@ -542,12 +556,12 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::GETWRITECOUNT;
         call->write_count_promise = std::make_shared<std::promise<int>>();
-
+        // call->start_time = std::chrono::steady_clock::now();
         // Get the future from the promise
         std::future<int> result_future = call->write_count_promise->get_future();
 
         // Start the asynchronous RPC
-        call->get_write_count_response_reader = stub_->AsyncGetWriteCount(&call->context, request, &cq_);
+        call->get_write_count_response_reader = get_stub()->AsyncGetWriteCount(&call->context, request, &cq_);
 
         // Request that, upon completion of the RPC, "call" be updated
         call->get_write_count_response_reader->Finish(&call->get_write_count_reply, &call->status, (void *)call);
@@ -575,12 +589,57 @@ public:
         tracker_ = tracker;
     }
 
+    double GetAverageLatency()
+    {
+        std::lock_guard<std::mutex> lock(latency_mutex_);
+
+        if (latencies_.empty())
+        {
+            return 0.0; // Avoid division by zero
+        }
+
+        long total_latency = 0;
+        for (const auto &latency : latencies_)
+        {
+            total_latency += latency;
+        }
+
+        return static_cast<double>(total_latency) / latencies_.size();
+    }
+
+    int get_current_rpcs() { return current_rpcs.load(); }
+
 private:
+    // Latency tracking
+    std::vector<long> latencies_; // To store latencies in microseconds
+    std::mutex latency_mutex_;    // Protects access to the latency vector
+
     std::unique_ptr<DBService::Stub> stub_;
+    std::vector<std::unique_ptr<DBService::Stub>> stubs_;
+    std::atomic<size_t> stub_counter{0};
+    DBService::Stub *get_stub(void)
+    {
+        if (stub_)
+        {
+            // Return stub_ if it exists
+            return stub_.get();
+        }
+        else if (!stubs_.empty())
+        {
+            // Use round-robin to select a stub from stubs_
+            size_t current_stub_index = stub_counter.fetch_add(1) % stubs_.size();
+            return stubs_[current_stub_index].get();
+        }
+
+        // Handle the case where both stub_ and stubs_ are empty
+        std::cerr << "Error: No stub available!" << std::endl;
+        return nullptr;
+    }
+
     Tracker *tracker_ = nullptr;
     // std::mutex mutex_;
     std::condition_variable cv_;
-    int current_rpcs = 0;
+    std::atomic<int> current_rpcs{0};
 
     grpc::CompletionQueue cq_;
     std::thread cq_thread_;
@@ -637,6 +696,8 @@ private:
 
         grpc::ClientContext context;
         grpc::Status status;
+
+        std::chrono::steady_clock::time_point start_time;
     };
 
     void AsyncCompleteRpc()
@@ -648,8 +709,21 @@ private:
         {
             AsyncClientCall *call = static_cast<AsyncClientCall *>(got_tag);
 
+            --current_rpcs;
+
             if (call->status.ok())
             {
+
+                if (call->call_type == AsyncClientCall::CallType::PUT)
+                {
+                    auto end_time = std::chrono::steady_clock::now();
+                    auto latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - call->start_time).count();
+                    {
+                        std::lock_guard<std::mutex> lock(latency_mutex_);
+                        latencies_.push_back(latency);
+                    }
+                }
+
                 switch (call->call_type)
                 {
                 case AsyncClientCall::CallType::GET:
@@ -725,7 +799,6 @@ private:
             // Decrement current_rpcs and notify
             // {
             // std::lock_guard<std::mutex> lock(mutex_);
-            --current_rpcs;
             // }
             // cv_.notify_one();
 
@@ -742,8 +815,20 @@ public:
     {
         // Start the completion queue thread
         cq_thread_ = std::thread(&CacheClient::AsyncCompleteRpc, this);
-        task_processing_thread_ = std::thread([this]()
-                                              { this->ProcessTasks(); });
+        // task_processing_thread_ = std::thread([this]()
+        //                                       { this->ProcessTasks(); });
+    }
+
+    CacheClient(std::string cache_address, int num_connections)
+    {
+        std::cout << "Created " << num_connections << " CacheClient stubs" << std::endl;
+
+        for (int i = 0; i < num_connections; ++i)
+        {
+            auto channel = grpc::CreateChannel(cache_address, grpc::InsecureChannelCredentials());
+            stubs_.push_back(CacheService::NewStub(channel));
+        }
+        cq_thread_ = std::thread(&CacheClient::AsyncCompleteRpc, this);
     }
 
     ~CacheClient()
@@ -751,12 +836,12 @@ public:
         // Shutdown the completion queue and join the thread
         cq_.Shutdown();
         cq_thread_.join();
-        StopTaskProcessing();
+        // StopTaskProcessing();
 
-        if (task_processing_thread_.joinable())
-        {
-            task_processing_thread_.join();
-        }
+        // if (task_processing_thread_.joinable())
+        // {
+        //     task_processing_thread_.join();
+        // }
     }
 
     // Asynchronous Get method returning a future
@@ -788,7 +873,7 @@ public:
 
         // Start the asynchronous RPC
         // std::cout << "Before AsyncGet: " << key << std::endl;
-        call->get_response_reader = stub_->AsyncGet(&call->context, request, &cq_);
+        call->get_response_reader = get_stub()->AsyncGet(&call->context, request, &cq_);
         call->get_response_reader->Finish(&call->get_reply, &call->status, (void *)call);
         // std::cout << "After AsyncGet: " << key << std::endl;
 
@@ -818,13 +903,13 @@ public:
         call->call_type = AsyncClientCall::CallType::SET;
         call->key = key;
         call->set_promise = std::make_shared<std::promise<bool>>();
-        call->start_time = std::chrono::steady_clock::now();
+        // call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<bool> result_future = call->set_promise->get_future();
 
         // Start the asynchronous RPC
-        call->set_response_reader = stub_->AsyncSet(&call->context, request, &cq_);
+        call->set_response_reader = get_stub()->AsyncSet(&call->context, request, &cq_);
         call->set_response_reader->Finish(&call->set_reply, &call->status, (void *)call);
 
         return result_future;
@@ -851,13 +936,13 @@ public:
         call->call_type = AsyncClientCall::CallType::INVALIDATE;
         call->key = key;
         call->invalidate_promise = std::make_shared<std::promise<bool>>();
-        call->start_time = std::chrono::steady_clock::now();
+        // call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<bool> result_future = call->invalidate_promise->get_future();
 
         // Start the asynchronous RPC
-        call->invalidate_response_reader = stub_->AsyncInvalidate(&call->context, request, &cq_);
+        call->invalidate_response_reader = get_stub()->AsyncInvalidate(&call->context, request, &cq_);
         call->invalidate_response_reader->Finish(&call->invalidate_reply, &call->status, (void *)call);
 
         return result_future;
@@ -885,13 +970,13 @@ public:
         call->call_type = AsyncClientCall::CallType::UPDATE;
         call->key = key;
         call->update_promise = std::make_shared<std::promise<bool>>();
-        call->start_time = std::chrono::steady_clock::now();
+        // call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<bool> result_future = call->update_promise->get_future();
 
         // Start the asynchronous RPC
-        call->update_response_reader = stub_->AsyncUpdate(&call->context, request, &cq_);
+        call->update_response_reader = get_stub()->AsyncUpdate(&call->context, request, &cq_);
         call->update_response_reader->Finish(&call->update_reply, &call->status, (void *)call);
 
         return result_future;
@@ -917,13 +1002,13 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::SETTTL;
         call->set_ttl_promise = std::make_shared<std::promise<bool>>();
-        call->start_time = std::chrono::steady_clock::now();
+        // call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<bool> result_future = call->set_ttl_promise->get_future();
 
         // Start the asynchronous RPC
-        call->set_ttl_response_reader = stub_->AsyncSetTTL(&call->context, request, &cq_);
+        call->set_ttl_response_reader = get_stub()->AsyncSetTTL(&call->context, request, &cq_);
         call->set_ttl_response_reader->Finish(&call->set_ttl_reply, &call->status, (void *)call);
 
         return result_future;
@@ -948,13 +1033,13 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::GETMR;
         call->get_mr_promise = std::make_shared<std::promise<float>>();
-        call->start_time = std::chrono::steady_clock::now();
+        // call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<float> result_future = call->get_mr_promise->get_future();
 
         // Start the asynchronous RPC
-        call->get_mr_response_reader = stub_->AsyncGetMR(&call->context, request, &cq_);
+        call->get_mr_response_reader = get_stub()->AsyncGetMR(&call->context, request, &cq_);
         call->get_mr_response_reader->Finish(&call->get_mr_reply, &call->status, (void *)call);
 
         return result_future;
@@ -978,13 +1063,13 @@ public:
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::GETFRESHNESSSTATS;
         call->get_freshness_stats_promise = std::make_shared<std::promise<std::tuple<int, int>>>();
-        call->start_time = std::chrono::steady_clock::now();
+        // call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
         std::future<std::tuple<int, int>> result_future = call->get_freshness_stats_promise->get_future();
 
         // Start the asynchronous RPC
-        call->get_freshness_stats_response_reader = stub_->AsyncGetFreshnessStats(&call->context, request, &cq_);
+        call->get_freshness_stats_response_reader = get_stub()->AsyncGetFreshnessStats(&call->context, request, &cq_);
         call->get_freshness_stats_response_reader->Finish(&call->get_freshness_stats_reply, &call->status, (void *)call);
 
         return result_future;
@@ -1110,6 +1195,7 @@ public:
     double GetAverageLatency()
     {
         std::lock_guard<std::mutex> lock(latency_mutex_);
+        std::cerr << "GetAverageLatency: " << latencies_.size() << std::endl;
 
         if (latencies_.empty())
         {
@@ -1121,7 +1207,6 @@ public:
         {
             total_latency += latency;
         }
-
         return static_cast<double>(total_latency) / latencies_.size();
     }
 
@@ -1201,43 +1286,64 @@ private:
 #endif
 
     std::unique_ptr<CacheService::Stub> stub_;
+    std::vector<std::unique_ptr<CacheService::Stub>> stubs_;
+    std::atomic<size_t> stub_counter{0};
+    CacheService::Stub *get_stub(void)
+    {
+        if (stub_)
+        {
+            // Return stub_ if it exists
+            return stub_.get();
+        }
+        else if (!stubs_.empty())
+        {
+            // Use round-robin to select a stub from stubs_
+            size_t current_stub_index = stub_counter.fetch_add(1) % stubs_.size();
+            return stubs_[current_stub_index].get();
+        }
+
+        // Handle the case where both stub_ and stubs_ are empty
+        std::cerr << "Error: No stub available!" << std::endl;
+        return nullptr;
+    }
+
     Tracker *tracker_ = nullptr;
 
-    std::queue<std::function<void()>> task_queue;
-    std::mutex task_mutex;
-    std::condition_variable task_cv;
-    bool stop_processing = false;
+    // std::queue<std::function<void()>> task_queue;
+    // std::mutex task_mutex;
+    // std::condition_variable task_cv;
+    // bool stop_processing = false;
 
     // Function to process tasks in a separate thread
-    void ProcessTasks()
-    {
-        while (true)
-        {
-            std::function<void()> task;
+    // void ProcessTasks()
+    // {
+    //     while (true)
+    //     {
+    //         std::function<void()> task;
 
-            {
-                std::unique_lock<std::mutex> lock(task_mutex);
-                task_cv.wait(lock, [this]
-                             { return !task_queue.empty() || stop_processing; });
-                if (stop_processing && task_queue.empty())
-                    return; // Exit the thread
-                task = std::move(task_queue.front());
-                task_queue.pop();
-            }
+    //         {
+    //             std::unique_lock<std::mutex> lock(task_mutex);
+    //             task_cv.wait(lock, [this]
+    //                          { return !task_queue.empty() || stop_processing; });
+    //             if (stop_processing && task_queue.empty())
+    //                 return; // Exit the thread
+    //             task = std::move(task_queue.front());
+    //             task_queue.pop();
+    //         }
 
-            task(); // Execute the task
-        }
-    }
+    //         task(); // Execute the task
+    //     }
+    // }
 
     // Enqueue task to process the call in a separate thread
-    void EnqueueTask(std::function<void()> task)
-    {
-        {
-            std::lock_guard<std::mutex> lock(task_mutex);
-            task_queue.push(std::move(task));
-        }
-        task_cv.notify_one();
-    }
+    // void EnqueueTask(std::function<void()> task)
+    // {
+    //     {
+    //         std::lock_guard<std::mutex> lock(task_mutex);
+    //         task_queue.push(std::move(task));
+    //     }
+    //     task_cv.notify_one();
+    // }
 
     // Async completion handler
     void AsyncCompleteRpc()
@@ -1245,123 +1351,121 @@ private:
         void *got_tag;
         bool ok = false;
 
+        size_t num_worker_threads = std::thread::hardware_concurrency() * 2;
+        ThreadPool thread_pool(num_worker_threads);
+
         while (cq_.Next(&got_tag, &ok))
         {
             AsyncClientCall *call = static_cast<AsyncClientCall *>(got_tag);
-
+            --current_rpcs;
+            if (call->call_type == AsyncClientCall::CallType::GET)
             {
-                // std::lock_guard<std::mutex> lock(mutex_);
-                --current_rpcs; // Decrement immediately
+                auto end_time = std::chrono::steady_clock::now();
+                auto latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - call->start_time).count();
+                {
+                    std::lock_guard<std::mutex> lock(latency_mutex_);
+                    latencies_.push_back(latency);
+                }
             }
-#ifdef USE_RPC_LIMIT
-            cv_.notify_one();
-#endif
+
             // Offload the status check and promise handling to a worker thread
-            EnqueueTask([call, ok, this]
+            thread_pool.enqueue([call, ok, this]() mutable
+                                {
+                try
+                {
+                    if (call->status.ok())
+                    {
+
+                        // Handle success based on the call type
+                        switch (call->call_type)
                         {
-                            if (call->status.ok())
-                            {
+                        case AsyncClientCall::CallType::GET:
+                            call->get_promise->set_value(call->get_reply.value());
+                            break;
+                        case AsyncClientCall::CallType::SET:
+                            call->set_promise->set_value(call->set_reply.success());
+                            break;
+                        case AsyncClientCall::CallType::INVALIDATE:
+                            call->invalidate_promise->set_value(call->invalidate_reply.success());
+                            break;
+                        case AsyncClientCall::CallType::UPDATE:
+                            call->update_promise->set_value(call->update_reply.success());
+                            break;
+                        case AsyncClientCall::CallType::SETTTL:
+                            call->set_ttl_promise->set_value(call->set_ttl_reply.success());
+                            break;
+                        case AsyncClientCall::CallType::GETMR:
+                            call->get_mr_promise->set_value(call->get_mr_reply.mr());
+                            break;
+                        case AsyncClientCall::CallType::GETFRESHNESSSTATS:
+                            int invalidates = call->get_freshness_stats_reply.num_invalidates();
+                            int updates = call->get_freshness_stats_reply.num_updates();
+                            call->get_freshness_stats_promise->set_value(std::make_tuple(invalidates, updates));
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        // Handle RPC failure
+                        std::string error_message = "RPC failed: " + call->status.error_message();
 
-                                auto end_time = std::chrono::steady_clock::now();
-                                auto latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - call->start_time).count();
+                        // Switch on call type to set the appropriate exception
+                        switch (call->call_type)
+                        {
+                        case AsyncClientCall::CallType::GET:
+                            error_message += "GET ";
+                            call->get_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
+                            break;
+                        case AsyncClientCall::CallType::SET:
+                            error_message += "SET ";
+                            call->set_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
+                            break;
+                        case AsyncClientCall::CallType::INVALIDATE:
+                            error_message += "INVALIDATE ";
+                            call->invalidate_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
+                            break;
+                        case AsyncClientCall::CallType::UPDATE:
+                            error_message += "UPDATE ";
+                            call->update_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
+                            break;
+                        case AsyncClientCall::CallType::SETTTL:
+                            error_message += "SETTTL ";
+                            call->set_ttl_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
+                            break;
+                        case AsyncClientCall::CallType::GETMR:
+                            error_message += "GETMR ";
+                            call->get_mr_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
+                            break;
+                        case AsyncClientCall::CallType::GETFRESHNESSSTATS:
+                            error_message += "GETFRESHNESSSTATS ";
+                            call->get_freshness_stats_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
+                            break;
+                        }
 
-                                // Add latency to the vector (protected by a mutex)
-                                {
-                                    std::lock_guard<std::mutex> lock(latency_mutex_);
-                                    latencies_.push_back(latency);
-                                }
+                        // Optionally log the error
+                        std::cerr << error_message << " for key: " << call->key << std::endl;
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    // Handle any exceptions to ensure the thread doesn't crash
+                    std::cerr << "Exception in thread: " << e.what() << std::endl;
+                }
 
-                                switch (call->call_type)
-                                {
-                                case AsyncClientCall::CallType::GET:
-                                    call->get_promise->set_value(call->get_reply.value());
-                                    break;
-                                case AsyncClientCall::CallType::SET:
-                                    call->set_promise->set_value(call->set_reply.success());
-                                    break;
-                                case AsyncClientCall::CallType::INVALIDATE:
-                                    call->invalidate_promise->set_value(call->invalidate_reply.success());
-                                    break;
-                                case AsyncClientCall::CallType::UPDATE:
-                                    call->update_promise->set_value(call->update_reply.success());
-                                    break;
-                                case AsyncClientCall::CallType::SETTTL:
-                                    call->set_ttl_promise->set_value(call->set_ttl_reply.success());
-                                    break;
-                                case AsyncClientCall::CallType::GETMR:
-                                    call->get_mr_promise->set_value(call->get_mr_reply.mr());
-                                    break;
-                                case AsyncClientCall::CallType::GETFRESHNESSSTATS:
-                                    int invalidates = call->get_freshness_stats_reply.num_invalidates();
-                                    int updates = call->get_freshness_stats_reply.num_updates();
-                                    call->get_freshness_stats_promise->set_value(std::make_tuple(invalidates, updates));
-                                    break;
-                                }
-                            }
-                            else
-                            {
-                                // Handle RPC failure
-                                std::string error_message = "RPC failed: " + call->status.error_message();
-                                switch (call->call_type)
-                                {
-                                case AsyncClientCall::CallType::GET:
-                                    error_message += "GET ";
-                                    call->get_promise->set_exception(
-                                        std::make_exception_ptr(std::runtime_error(error_message)));
-                                    break;
-                                case AsyncClientCall::CallType::SET:
-                                    error_message += "SET ";
-                                    call->set_promise->set_exception(
-                                        std::make_exception_ptr(std::runtime_error(error_message)));
-                                    break;
-                                case AsyncClientCall::CallType::INVALIDATE:
-                                    error_message += "INVALIDATE ";
-                                    call->invalidate_promise->set_exception(
-                                        std::make_exception_ptr(std::runtime_error(error_message)));
-                                    break;
-                                case AsyncClientCall::CallType::UPDATE:
-                                    error_message += "UPDATE ";
-                                    call->update_promise->set_exception(
-                                        std::make_exception_ptr(std::runtime_error(error_message)));
-                                    break;
-                                case AsyncClientCall::CallType::SETTTL:
-                                    error_message += "SETTTL ";
-                                    call->set_ttl_promise->set_exception(
-                                        std::make_exception_ptr(std::runtime_error(error_message)));
-                                    break;
-                                case AsyncClientCall::CallType::GETMR:
-                                    error_message += "GETMR ";
-                                    call->get_mr_promise->set_exception(
-                                        std::make_exception_ptr(std::runtime_error(error_message)));
-                                    break;
-                                case AsyncClientCall::CallType::GETFRESHNESSSTATS:
-                                    error_message += "GETFRESHNESSSTATS ";
-                                    call->get_freshness_stats_promise->set_exception(
-                                        std::make_exception_ptr(std::runtime_error(error_message)));
-                                    break;
-                                }
-
-                                // Optionally log the error
-                                std::cerr << error_message << " for key: " << call->key << std::endl;
-
-                                // Handle RPC failure. Exit immediately.
-                                // exit(-1);
-                            }
-
-                            delete call; // Clean up the call object
-                        });
+            // Clean up the call object safely
+            delete call; });
         }
     }
 
     // Stop the task processing thread
-    void StopTaskProcessing()
-    {
-        {
-            std::lock_guard<std::mutex> lock(task_mutex);
-            stop_processing = true;
-        }
-        task_cv.notify_all();
-    }
+    // void StopTaskProcessing()
+    // {
+    //     {
+    //         std::lock_guard<std::mutex> lock(task_mutex);
+    //         stop_processing = true;
+    //     }
+    //     task_cv.notify_all();
+    // }
 };
 
 class Client
@@ -1383,6 +1487,23 @@ public:
     void free_mc(memcached_st *memc)
     {
         memcached_pool_push(pool, memc);
+    }
+
+    Client(std::string cache_address, std::string db_address, int num_connections, Tracker *tracker)
+        : cache_client_(new CacheClient(cache_address, num_connections)),
+          db_client_(new DBClient(db_address, num_connections))
+    {
+        if (tracker != nullptr)
+        {
+            cache_client_->SetTracker(tracker);
+            db_client_->SetTracker(tracker);
+        }
+        // memc = create_mc();
+        const char *config_string =
+            "--SERVER=localhost:11211";
+
+        pool = memcached_pool(config_string, strlen(config_string));
+        assert(pool != nullptr);
     }
 
     Client(std::shared_ptr<Channel> cache_channel, std::shared_ptr<Channel> db_channel, Tracker *tracker)
@@ -1511,10 +1632,10 @@ public:
         return cache_client_->GetAverageLatency();
     }
 
-    // double GetDBAverageLatency(void)
-    // {
-    //     return db_client_->GetAverageLatency();
-    // }
+    double GetDBAverageLatency(void)
+    {
+        return db_client_->GetAverageLatency();
+    }
 
 private:
     DBClient *db_client_;

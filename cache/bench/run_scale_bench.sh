@@ -14,9 +14,10 @@ DB_VM_LOG_DIR="/home/maoziming/rocksdb/backend/build/logs"
 CACHE_VM_LOG_DIR="/home/maoziming/memcached/cache/build/logs"
 DB_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$DB_VM_IP"
 CACHE_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$CACHE_VM_IP"
-BENCHMARKS=("adaptive_bench" "invalidate_bench" "update_bench" "ttl_bench" "stale_bench")
+# BENCHMARKS=("ttl_bench" "adaptive_bench" "invalidate_bench" "update_bench" "stale_bench")
+BENCHMARKS=("ttl_bench" "stale_bench" "adaptive_bench")
 DATASETS=("IBM") # 100 is about right. 
-SCALES=("100" "90" "80" "70" "60" "50" "40" "30" "20")
+# SCALES=("100" "90" "80" "70" "60" "50" "40" "30")
 SCALES=("100")
 cd /home/maoziming/memcached/cache/build/
 make -j

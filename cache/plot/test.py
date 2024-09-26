@@ -32,7 +32,7 @@ plt.rc("figure", titlesize=BIG_SIZE)
 os.makedirs(output_dir, exist_ok=True)
 
 BENCHMARKS = ["stale_bench",  "ttl_bench", "invalidate_bench", "update_bench", "adaptive_bench"]
-DATASETS = ["Twitter", "PoissonMix", "Meta", "IBM"]
+DATASETS = ["IBM"]
 SCALES = list(range(10, 500, 10))
 
 dataset_to_reqs = {
@@ -189,7 +189,7 @@ for dataset in DATASETS:
                         va='bottom')
             
         # Add labels and title
-        plt.xlabel('Norm. Throughput (%)')
+        plt.xlabel('Norm. Offered Load (%)')
         plt.ylabel(x_title)
         plt.legend()
         plt.tight_layout()
@@ -202,10 +202,10 @@ for dataset in DATASETS:
         
     
     # plot_figure('CPU', 'Avg. CPU Util. (%)')
-    # plot_figure('NW', 'Avg. NW Usage (MB/s)')
+    plot_figure('NW', 'Avg. NW Usage (MB/s)')
     # plot_figure('Disk', 'Avg. Disk Usage (MB/s)')
     # plot_figure('num_active_connections', '# active conn.')
-    plot_figure('db_current_rpcs', '# ongoing RPCs (to DB)')
-    plot_figure('cache_current_rpcs', '# ongoing RPCs (to cache)')
+    # plot_figure('db_current_rpcs', '# ongoing RPCs (to DB)')
+    plot_figure('cache_current_rpcs', '# ongoing RPCs (to cache)', True)
 
     max_times_data = {"Benchmark": [], "Dataset": [], "Throughput": [], "Scale": [], "CPU": [], "NW": [], "Disk": [], "db_current_rpcs": [], "cache_current_rpcs": []}

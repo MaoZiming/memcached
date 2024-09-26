@@ -18,11 +18,15 @@ int main(int argc, char *argv[])
     Parser parser(argc, argv);
 
     // Create a channel to connect to the server
-    Client client(grpc::CreateChannel(CACHE_ADDR,
-                                      grpc::InsecureChannelCredentials()),
-                  grpc::CreateChannel(DB_ADDR,
-                                      grpc::InsecureChannelCredentials()),
-                  nullptr);
+    // Client client(grpc::CreateChannel(CACHE_ADDR,
+    //                                   grpc::InsecureChannelCredentials()),
+    //               grpc::CreateChannel(DB_ADDR,
+    //                                   grpc::InsecureChannelCredentials()),
+    //               nullptr);
+
+    Client client(CACHE_ADDR,
+                  DB_ADDR,
+                  5, parser.tracker);
 
     float ew = TTL_EW;
     int ttl = 1;

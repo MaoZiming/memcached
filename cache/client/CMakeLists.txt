@@ -7,11 +7,14 @@ find_package(Threads)
 # Sources
 #
 set(SOURCES
-    src/policy.hpp
+    src/thread_pool.cpp
+    # src/policy.hpp
     src/policy.cpp
+    # src/thread_pool.hpp
     src/client.hpp
+    # src/load_tracker.hpp
     src/load_tracker.cpp
-    src/load_tracker.hpp
+
     include/tqdm.hpp
     include/zipf.hpp
     include/benchmark.hpp

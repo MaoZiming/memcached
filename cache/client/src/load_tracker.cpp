@@ -172,7 +172,7 @@ void LogCPULoad(const std::string &logFile, DBClient *db_client, CacheClient *ca
                 << " bytes | "
                 << "Disk read: " << readBytes << " bytes, write: " << writeBytes
                 << " bytes"
-                // << ", DB current_rpcs: " << db_client->get_current_rpcs()
+                << ", DB current_rpcs: " << db_client->get_current_rpcs()
                 << ", Cache current_rpcs: " << cache_client->get_current_rpcs()
                 << std::endl;
         }

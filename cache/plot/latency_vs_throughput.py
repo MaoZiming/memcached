@@ -32,7 +32,7 @@ plt.rc("figure", titlesize=BIG_SIZE)
 os.makedirs(output_dir, exist_ok=True)
 
 BENCHMARKS = ["stale_bench",  "ttl_bench", "invalidate_bench", "update_bench", "adaptive_bench"]
-DATASETS = ["Twitter", "PoissonMix", "Meta", "IBM"]
+DATASETS = ["IBM"]
 SCALES = list(range(10, 500, 10))
 
 dataset_to_reqs = {
@@ -143,7 +143,7 @@ for dataset in DATASETS:
                         va='bottom')
                 
         # Add labels and title
-        plt.xlabel('Norm. Throughput (%)')
+        plt.xlabel('Norm. Offered Load (%)')
         plt.ylabel(x_title)
         plt.legend()
         plt.tight_layout()
@@ -155,6 +155,6 @@ for dataset in DATASETS:
         plt.figure(figsize=FIGSIZE)
 
     plot_figure('Cache Latency', 'Read Latency (ms)', True)
-    plot_figure('DB Latency', 'Write Latency (ms)', True)
+    plot_figure('DB Latency', 'Write Latency (ms)', False)
 
     data = {"Benchmark": [], "Dataset": [], "Scale": [], "Cache Latency": [], "DB Latency": [], "End-to-End Latency": [], "Throughput": []}
