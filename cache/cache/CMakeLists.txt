@@ -19,6 +19,7 @@ set(SOURCES
 set(HEADERS
     ${CMAKE_SOURCE_DIR}/client/src/client.hpp
     ${CMAKE_SOURCE_DIR}/client/src/policy.hpp
+    ${CMAKE_SOURCE_DIR}/client/src/thread_pool.cpp
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
