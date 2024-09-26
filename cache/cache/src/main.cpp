@@ -16,6 +16,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <cassert>
+#include "thread_pool.hpp"
 
 using grpc::Server;
 using grpc::ServerAsyncResponseWriter;
@@ -27,6 +28,34 @@ using grpc::Status;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
+
+// A simple object pool for reusing CallData instances
+template <typename T>
+class ObjectPool
+{
+public:
+    T *acquire()
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (!pool_.empty())
+        {
+            T *instance = pool_.back();
+            pool_.pop_back();
+            return instance;
+        }
+        return new T();
+    }
+
+    void release(T *instance)
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        pool_.push_back(instance);
+    }
+
+private:
+    std::vector<T *> pool_;
+    std::mutex mutex_;
+};
 
 class CacheServiceImpl final
 {
@@ -162,6 +191,20 @@ private:
         {
         }
 
+        GetCallData()
+            : CallData(nullptr, nullptr, nullptr)
+        {
+            // Constructor does minimal work; initialization is done in Initialize()
+        }
+
+        // Initialize method to set up service, completion queue, and implementation
+        void Initialize(CacheService::AsyncService *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+        {
+            service_ = service;
+            cq_ = cq;
+            impl_ = impl;
+        }
+
     protected:
         void RequestRPC() override
         {
@@ -170,7 +213,8 @@ private:
 
         void CreateNewInstance() override
         {
-            auto *new_call = new GetCallData(service_, cq_, impl_);
+            auto *new_call = impl_->get_call_pool_.acquire();
+            new_call->Initialize(service_, cq_, impl_);
             new_call->Proceed(true);
         }
 
@@ -191,45 +235,20 @@ private:
             }
             else
             {
-#ifdef DEBUG
-                std::cerr << "Miss: " << request_.key() << std::endl;
-#endif
-                /* Do not wait to finish */
                 impl_->cache_miss_++;
-                if (false)
+                std::future<std::string> fill_future = impl_->db_client_.AsyncFill(request_.key(), impl_->ttl_);
+                try
                 {
-
-                    impl_->db_client_.AsyncFill(request_.key(), impl_->ttl_);
-                    response_.set_value(std::string("Later"));
+                    std::string value = fill_future.get();
+                    memcached_set(memc, request_.key().c_str(), request_.key().size(), value.c_str(), value.size(), (time_t)impl_->ttl_, (uint32_t)0);
+                    response_.set_value(value);
                     response_.set_success(true);
                 }
-                else
+                catch (const std::exception &e)
                 {
-                    // Call AsyncFill and get the future
-
-                    // std::cout << "Start miss: " << request_.key() << std::endl;
-                    std::future<std::string> fill_future = impl_->db_client_.AsyncFill(request_.key(), impl_->ttl_);
-
-                    // Wait for the AsyncFill operation to finish
-                    try
-                    {
-                        // You can use wait() if you don't care about the result, or get() to retrieve the result.
-                        std::string value = fill_future.get(); // This blocks until the async operation is done
-
-                        // Store the value in Memcached
-                        memcached_set(memc, request_.key().c_str(), request_.key().size(), value.c_str(), value.size(), (time_t)impl_->ttl_, (uint32_t)0);
-
-                        response_.set_value(value);
-                        response_.set_success(true);
-                    }
-                    catch (const std::exception &e)
-                    {
-                        // Handle any exceptions thrown during the async operation
-                        std::cerr << "Exception occurred: " << e.what() << std::endl;
-                        response_.set_value(std::string("Error during AsyncFill"));
-                        response_.set_success(false);
-                    }
-                    // std::cout << "Finish miss:  " << request_.key() << std::endl;
+                    std::cerr << "Exception occurred: " << e.what() << std::endl;
+                    response_.set_value(std::string("Error during AsyncFill"));
+                    response_.set_success(false);
                 }
             }
             impl_->free_mc(memc);
@@ -244,6 +263,20 @@ private:
         {
         }
 
+        SetCallData()
+            : CallData(nullptr, nullptr, nullptr)
+        {
+            // Constructor does minimal work; initialization is done in Initialize()
+        }
+
+        // Initialize method to set up service, completion queue, and implementation
+        void Initialize(CacheService::AsyncService *service, ServerCompletionQueue *cq, CacheServiceImpl *impl)
+        {
+            service_ = service;
+            cq_ = cq;
+            impl_ = impl;
+        }
+
     protected:
         void RequestRPC() override
         {
@@ -252,7 +285,8 @@ private:
 
         void CreateNewInstance() override
         {
-            auto *new_call = new SetCallData(service_, cq_, impl_);
+            auto *new_call = impl_->set_call_pool_.acquire();
+            new_call->Initialize(service_, cq_, impl_);
             new_call->Proceed(true);
         }
 
@@ -433,10 +467,12 @@ private:
     void HandleRpcs()
     {
         // Spawn new CallData instances to serve new clients.
-        auto *get_call = new GetCallData(&async_service_, cq_.get(), this);
+        auto *get_call = get_call_pool_.acquire();
+        get_call->Initialize(&async_service_, cq_.get(), this);
         get_call->Proceed(true);
 
-        auto *set_call = new SetCallData(&async_service_, cq_.get(), this);
+        auto *set_call = set_call_pool_.acquire();
+        set_call->Initialize(&async_service_, cq_.get(), this);
         set_call->Proceed(true);
 
         auto *setttl_call = new SetTTLCallData(&async_service_, cq_.get(), this);
@@ -454,17 +490,25 @@ private:
         auto *get_freshness_stats_call = new GetFreshnessStatsCallData(&async_service_, cq_.get(), this);
         get_freshness_stats_call->Proceed(true);
 
-        void *tag; // uniquely identifies a request.
+        size_t num_worker_threads = std::thread::hardware_concurrency();
+        ThreadPool thread_pool(num_worker_threads);
+
+        void *tag; // Uniquely identifies a request.
         bool ok;
+
         while (cq_->Next(&tag, &ok))
         {
             if (ok)
             {
-                static_cast<CallDataBase *>(tag)->Proceed(true);
+                // Enqueue the processing task into the ThreadPool
+                thread_pool.enqueue([tag]()
+                                    { static_cast<CallDataBase *>(tag)->Proceed(true); });
             }
             else
             {
-                delete static_cast<CallDataBase *>(tag);
+                // Enqueue the cleanup task into the ThreadPool
+                thread_pool.enqueue([tag]()
+                                    { delete static_cast<CallDataBase *>(tag); });
             }
         }
     }
@@ -473,6 +517,10 @@ private:
     CacheService::AsyncService async_service_;
     std::unique_ptr<Server> server_;
     std::thread server_thread_;
+
+    /* Call pool */
+    ObjectPool<GetCallData> get_call_pool_;
+    ObjectPool<SetCallData> set_call_pool_;
 
     DBClient db_client_;
     memcached_pool_st *pool;

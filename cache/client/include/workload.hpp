@@ -707,7 +707,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/IBM/data";
-    int num_operations_ = 300000 / 10;
+    int num_operations_ = 300000;
 };
 
 class TencentWorkload : public Workload

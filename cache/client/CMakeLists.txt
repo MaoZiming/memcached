@@ -35,7 +35,7 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
 #
 add_executable(
     client
-    src/main.cpp     
+    src/main.cpp
     ${SOURCES}
 )
 
@@ -122,7 +122,6 @@ target_link_libraries(stale_bench
     /usr/local/lib/libmemcached.so
     /usr/local/lib/libmemcachedutil.so
 )
-
 
 target_link_libraries(dataset
     PRIVATE

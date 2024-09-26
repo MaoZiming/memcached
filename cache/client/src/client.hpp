@@ -238,33 +238,17 @@ public:
 
     std::future<std::string> AsyncFill(const std::string &key, int ttl)
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
         ++current_rpcs;
-        // }
-
-        // Create a promise and return a future associated with it
         auto promise = std::make_shared<std::promise<std::string>>();
         std::future<std::string> result_future = promise->get_future();
 
-        // Launch an async task to query the DB and fill the cache when done
         std::thread([this, key, ttl, promise]()
                     {
                         try
                         {
-                            // Asynchronously get the value from the DB
-                            // std::cout << "db_value starts: " << key << std::endl;
-
                             std::string db_value = Get(key);
-                            // std::cout << "db_value finishes: " << key << ", " << db_value.size() << std::endl;
                             if (!db_value.empty())
                             {
-#ifdef DEBUG
-                                std::cerr << "Miss finished: " << key << std::endl;
-#endif
-                                // Fulfill the promise with success
                                 promise->set_value(db_value);
                             }
                             else
@@ -275,33 +259,15 @@ public:
                         }
                         catch (const std::exception &e)
                         {
-                            // If an exception occurs, set the promise exception
                             promise->set_exception(std::make_exception_ptr(e));
-                        }
-
-                        // Decrease the current RPC count and notify the condition variable
-                        // {
-                        //     std::lock_guard<std::mutex> lock(mutex_);
-                        //     --current_rpcs;
-                        // }
-                        // cv_.notify_one();
-                    })
-            .detach(); // Detach the thread to avoid blocking
-
-        // Return the future so the caller can wait on it
+                        } })
+            .detach();
         return result_future;
     }
 
     std::future<bool> AsyncPut(const std::string &key, const std::string &value, float ew)
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
         ++current_rpcs;
-        // }
-
-        // Build the request
         DBPutRequest request;
         request.set_key(key);
         request.set_value(value);
@@ -358,18 +324,12 @@ public:
     // Modified Delete method using Async pattern
     std::future<bool> AsyncDelete(const std::string &key)
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
         ++current_rpcs;
-        // }
 
         // Build the request
         DBDeleteRequest request;
         request.set_key(key);
 
-        // Call object to store RPC data
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::DELETE;
         call->key = key;
@@ -383,8 +343,7 @@ public:
 
         // Request that, upon completion of the RPC, "call" be updated
         call->delete_response_reader->Finish(&call->delete_reply, &call->status, (void *)call);
-
-        return result_future; // Return the future immediately
+        return result_future;
     }
 
     // Synchronous Delete method that waits for the result
@@ -405,28 +364,15 @@ public:
     // Asynchronous GetLoad method returning a future
     std::future<int> AsyncGetLoad()
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
         ++current_rpcs;
-        // }
-
-        // Build the request
         DBGetLoadRequest request;
 
-        // Call object to store RPC data
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::GETLOAD;
         call->load_promise = std::make_shared<std::promise<int>>();
 
-        // Get the future from the promise
         std::future<int> result_future = call->load_promise->get_future();
-
-        // Start the asynchronous RPC
-        call->get_load_response_reader = get_stub()->AsyncGetLoad(&call->context, request, &cq_);
-        // call->start_time = std::chrono::steady_clock::now();
-        // Request that, upon completion of the RPC, "call" be updated
+        call->get_load_response_reader = stub_->AsyncGetLoad(&call->context, request, &cq_);
         call->get_load_response_reader->Finish(&call->get_load_reply, &call->status, (void *)call);
 
         return result_future; // Return the future immediately
@@ -450,18 +396,11 @@ public:
     // Asynchronous StartRecord method returning a future
     std::future<bool> AsyncStartRecord()
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
         ++current_rpcs;
         // }
 
         // Build the request
         DBStartRecordRequest request;
-        // Set the log_path in the request if necessary (assuming log_path is part of the message)
-        // request.set_log_path(log_path); // Uncomment if log_path is needed
-
         // Call object to store RPC data
         AsyncClientCall *call = new AsyncClientCall;
         call->call_type = AsyncClientCall::CallType::STARTRECORD;
@@ -497,12 +436,7 @@ public:
     // Asynchronous GetDBReadCount method returning a future
     std::future<int> AsyncGetDBReadCount()
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
         ++current_rpcs;
-        // }
 
         // Build the request
         DBGetReadCountRequest request;
@@ -542,13 +476,7 @@ public:
     // Asynchronous GetDBWriteCount method returning a future
     std::future<int> AsyncGetDBWriteCount()
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
         ++current_rpcs;
-        // }
-
         // Build the request
         DBGetWriteCountRequest request;
 
@@ -847,16 +775,7 @@ public:
     // Asynchronous Get method returning a future
     std::future<std::string> GetAsync(const std::string &key)
     {
-        // std::cout << "Start AsyncGet: " << key << std::endl;
-        // {
-        // #ifdef USE_RPC_LIMIT
-        // std::unique_lock<std::mutex> lock(mutex_);
-        // cv_.wait(lock, [this]()
-        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        // #endif
         ++current_rpcs;
-        // }
-
         // Build the request
         CacheGetRequest request;
         request.set_key(key);
