@@ -105,7 +105,7 @@ public:
         cq_ = builder.AddCompletionQueue();
 
         server_ = builder.BuildAndStart();
-        std::cout << "Async server listening on " << server_address << std::endl;
+        std::cout << "Cache Async server listening on " << server_address << std::endl;
 
         CacheServiceImpl::HandleRpcs();
         // Start the thread that will process RPCs
@@ -227,6 +227,7 @@ private:
             memcached_return_t result;
             memcached_st *memc = impl_->create_mc();
             value = memcached_get(memc, request_.key().c_str(), request_.key().size(), &value_length, &flags, &result);
+            impl_->free_mc(memc);
             if (result == MEMCACHED_SUCCESS)
             {
                 impl_->cache_hits_++;
@@ -277,7 +278,9 @@ private:
                 try
                 {
                     std::string value = fill_future.get();
-                    memcached_set(memc, request_.key().c_str(), request_.key().size(), value.c_str(), value.size(), (time_t)impl_->ttl_, (uint32_t)0);
+                    memcached_st *memc_async = impl->create_mc();
+                    memcached_set(memc_async, request_.key().c_str(), request_.key().size(), value.c_str(), value.size(), (time_t)impl_->ttl_, (uint32_t)0);
+                    impl_->free_mc(memc_async);
                     response_.set_value(value);
                     response_.set_success(true);
                 }
@@ -288,7 +291,6 @@ private:
                     response_.set_success(false);
                 }
             }
-            impl_->free_mc(memc);
         }
     };
 
