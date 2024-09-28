@@ -17,6 +17,7 @@
 #include <condition_variable>
 #include <cassert>
 #include "thread_pool.hpp"
+#include <filesystem>
 
 using grpc::Server;
 using grpc::ServerAsyncResponseWriter;

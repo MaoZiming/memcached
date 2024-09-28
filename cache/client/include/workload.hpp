@@ -12,6 +12,7 @@
 #include "client.hpp"
 #include "zipf.hpp"
 #include "tqdm.hpp"
+#include <filesystem>
 
 const int KB = 1000;
 const int MB = 1000 * KB;
