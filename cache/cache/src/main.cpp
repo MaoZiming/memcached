@@ -220,6 +220,7 @@ private:
 
         void ProcessRequest() override
         {
+
             char *value = nullptr;
             size_t value_length = 0;
             uint32_t flags = 0;
@@ -233,7 +234,14 @@ private:
                 response_.set_success(true);
                 free(value); // Free allocated memory
             }
-            else if (true)
+            else if (false)
+            {
+                impl_->cache_miss_++;
+                // Set the response to indicate the value will be available later
+                response_.set_value("will be available later");
+                response_.set_success(true);
+            }
+            else if (false)
             {
                 impl_->cache_miss_++;
                 std::string key = request_.key();
