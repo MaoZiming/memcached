@@ -570,7 +570,7 @@ private:
 
 void RunServer()
 {
-    std::string db_address("0.0.0.0:50051");
+    std::string db_address("10.128.0.33:50051");
     std::shared_ptr<Channel> channel = grpc::CreateChannel(db_address, grpc::InsecureChannelCredentials());
     if (!channel)
     {
