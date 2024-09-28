@@ -278,7 +278,7 @@ private:
                 try
                 {
                     std::string value = fill_future.get();
-                    memcached_st *memc_async = impl->create_mc();
+                    memcached_st *memc_async = impl_->create_mc();
                     memcached_set(memc_async, request_.key().c_str(), request_.key().size(), value.c_str(), value.size(), (time_t)impl_->ttl_, (uint32_t)0);
                     impl_->free_mc(memc_async);
                     response_.set_value(value);
