@@ -31,7 +31,7 @@ const int C_M = C_I + C_U;
         }                                      \
     } while (false)
 
-const std::string CACHE_ADDR = "10.128.0.39:50051";
+const std::string CACHE_ADDR = "0.0.0.0:50051";
 const std::string DB_ADDR = "10.128.0.33:50051";
 int warmup_factor = 5;
 
