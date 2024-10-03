@@ -12,7 +12,7 @@
 #include "client.hpp"
 #include "zipf.hpp"
 #include "tqdm.hpp"
-
+#include <unordered_set>
 const int KB = 1000;
 const int MB = 1000 * KB;
 
@@ -43,9 +43,9 @@ public:
 
     void init(int scale_factor)
     {
-        if (scale_factor != -1)
-            scale_factor_ = scale_factor;
+        scale_factor_ = scale_factor;
         generateRequests(); // Calls the derived class's generateRequests method
+        buildWriteCountStructure();
         report_stats();
     }
 
@@ -119,7 +119,11 @@ public:
 #ifdef DEBUG
         assert(i < intervals_.size());
 #endif
-        return intervals_[i].interval;
+        // Scale the interval using a floating-point factor
+        double scaled_interval = static_cast<double>(intervals_[i].interval.count()) / true_scale_factor;
+
+        // Convert back to std::chrono::milliseconds
+        return std::chrono::milliseconds(static_cast<int64_t>(scaled_interval));
     }
 
     int num_operations()
@@ -141,7 +145,7 @@ public:
         return static_cast<double>(read_count) / intervals_.size();
     }
 
-    double get_average_interval() const
+    double get_average_interval()
     {
         if (intervals_.empty())
             return 0.0;
@@ -151,7 +155,14 @@ public:
         {
             total_size += r.interval.count();
         }
-        return static_cast<double>(total_size) / intervals_.size();
+        double average_interval = static_cast<double>(total_size) / intervals_.size();
+        if (true_scale_factor == 1)
+        {
+            true_scale_factor = scale_factor_ * average_interval / 100;
+            std::cout << "Setting the true_scale_factor to: " << true_scale_factor << std::endl;
+        }
+
+        return average_interval / true_scale_factor;
     }
 
     int get_min_interval() const
@@ -227,6 +238,55 @@ public:
         return max_size;
     }
 
+    // Function to build the write count structure
+    void buildWriteCountStructure()
+    {
+        // Initialize the map with vectors of the same size as intervals_
+        for (const auto &req : intervals_)
+        {
+            if (write_count_before_next_read.find(req.key) == write_count_before_next_read.end())
+            {
+                write_count_before_next_read[req.key] = std::vector<int>(intervals_.size(), 0);
+            }
+        }
+
+        // Iterate through the intervals and count writes until the next read
+        for (int i = 0; i < intervals_.size(); ++i)
+        {
+            const auto &req = intervals_[i];
+            // If the current request is a read, reset the count for this key
+            if (req.is_write)
+            {
+                int count = 1;
+                // Iterate forwards to count the writes until the next read for the same key
+                for (int j = i + 1; j < intervals_.size(); ++j)
+                {
+                    if (intervals_[j].key == req.key)
+                    {
+                        if (intervals_[j].is_write)
+                        {
+                            count++;
+                        }
+                        else
+                        {
+                            break; // Stop when the next read is found
+                        }
+                    }
+                }
+                // Store the count for the current index
+                write_count_before_next_read[req.key][i] = count;
+            }
+        }
+    }
+
+    // Function to get the number of writes for the same key after a given index
+    int getWriteCountAfterIndex(int index)
+    {
+        const auto &req = intervals_[index];
+        assert(req.is_write);
+        return write_count_before_next_read[req.key][index];
+    }
+
     void report_stats()
     {
         std::cout << "Total requests: " << intervals_.size() << std::endl;
@@ -248,7 +308,7 @@ public:
 
     std::unordered_map<std::string, int> keys_to_val_size;
 
-    std::chrono::milliseconds get_interval(std::chrono::milliseconds op_time)
+    std::chrono::milliseconds _get_interval(std::chrono::milliseconds op_time)
     {
         std::chrono::milliseconds interval = (last_op_time.count() == 0)
                                                  ? std::chrono::milliseconds(0)
@@ -267,12 +327,14 @@ public:
 
     int num_distinct_keys = -1;
     int scale_factor_ = 1; // Will be modified.
+    double true_scale_factor = 1;
 
 protected:
     std::vector<request> intervals_;
     std::chrono::milliseconds last_op_time{0};
     std::chrono::milliseconds max_interval_{1000};
     int num_operations_ = 200000;
+    std::unordered_map<std::string, std::vector<int>> write_count_before_next_read;
 
     std::vector<std::string>
     getSortedFiles(const std::string &directory_path)
@@ -295,9 +357,9 @@ protected:
 class PoissonWorkload : public Workload
 {
 public:
-    int num_operations_ = 500000;
-    int num_keys = 10000;               // Number of keys
-    double lambda = 50 * scale_factor_; // Poisson distribution parameter (average request rate)
+    int num_operations_ = 500000 / 5;
+    int num_keys = 10000; // Number of keys
+    double lambda = 200;  // Poisson distribution parameter (average request rate)
     double alpha = 1.1;
     int key_size_in_KB = 100;
 
@@ -308,7 +370,7 @@ private:
             num_operations_ = num_ops;
         // Same seed.
         std::default_random_engine generator(0);
-        std::exponential_distribution<double> distribution(lambda * scale_factor_);
+        std::exponential_distribution<double> distribution(lambda);
         std::vector<std::string> keys(num_keys);
         std::vector<int> distribution_values;
         if (alpha > 1.0)
@@ -358,7 +420,7 @@ class PoissonMixWorkload : public PoissonWorkload
             num_operations_ = num_ops;
         // Same seed.
         std::default_random_engine generator(0);
-        std::exponential_distribution<double> distribution(lambda * scale_factor_);
+        std::exponential_distribution<double> distribution(lambda);
         std::vector<std::string> keys(num_keys);
         std::vector<int> distribution_values;
         if (alpha > 1.0)
@@ -418,7 +480,7 @@ private:
             num_operations_ = num_ops;
         // Same seed.
         std::default_random_engine generator(0);
-        std::exponential_distribution<double> distribution(lambda * scale_factor_);
+        std::exponential_distribution<double> distribution(lambda);
         std::vector<std::string> keys(num_keys);
         std::vector<int> distribution_values;
         if (alpha > 1.0)
@@ -504,7 +566,7 @@ private:
                     break;
                 }
                 request r;
-                r.interval = get_interval(op_time);
+                r.interval = _get_interval(op_time);
                 r.is_write = is_write;
                 r.key = key;
                 r.value_size = get_value_size(val_size + key_size);
@@ -518,17 +580,11 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Meta/data";
-    int num_operations_ = 500000;
+    int num_operations_ = 500000 / 5;
 };
 
 class TwitterWorkload : public Workload
 {
-public:
-    TwitterWorkload()
-    {
-        scale_factor_ = 3;
-    }
-
 private:
     void generateRequests(int num_ops = -1) override
     {
@@ -599,7 +655,7 @@ private:
                         }
 
                         request r;
-                        r.interval = get_interval(op_time);
+                        r.interval = _get_interval(op_time);
                         r.is_write = (op != "get" && op != "gets");
                         r.key = key;
                         std::string value = std::string(key_size + value_size, 'a');
@@ -630,18 +686,11 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/Twitter/2020Mar";
-    int num_operations_ = 500000;
+    int num_operations_ = 500000 / 5;
 };
 
 class IBMWorkload : public Workload
 {
-public:
-    IBMWorkload()
-    {
-        max_interval_ = std::chrono::milliseconds{200};
-        scale_factor_ = 200;
-    }
-
 private:
     // Problem: ObjectStoreTrace object size is quite big. 100s MB.
     void generateRequests(int num_ops = -1) override
@@ -692,7 +741,7 @@ private:
                     }
 
                     request r;
-                    r.interval = get_interval(op_time);
+                    r.interval = _get_interval(op_time);
                     ;
                     r.is_write = (request_type == "REST.PUT.OBJECT");
                     r.key = object_id;
@@ -707,7 +756,7 @@ private:
 
 private:
     std::string file_name_ = "/home/maoziming/memcached/cache/dataset/IBM/data";
-    int num_operations_ = 300000 / 10;
+    int num_operations_ = 300000 / 3;
 };
 
 class TencentWorkload : public Workload
@@ -760,7 +809,7 @@ private:
                     }
 
                     request r;
-                    r.interval = get_interval(op_time);
+                    r.interval = _get_interval(op_time);
                     r.is_write = (is_write == 1);
                     r.key = lba + "_" + namespace_id; // lba + namespace as key
                     r.value_size = get_value_size(size);
@@ -828,7 +877,7 @@ private:
             r.key = std::to_string(device_id) + "_" + std::to_string(offset);
             r.value_size = get_value_size(length); // Dummy value
             r.is_write = (opcode == 'W');
-            r.interval = get_interval(op_time);
+            r.interval = _get_interval(op_time);
 
             // Add the request to the intervals
             intervals_.push_back(r);
@@ -894,7 +943,7 @@ private:
                     }
 
                     request r;
-                    r.interval = get_interval(op_time);
+                    r.interval = _get_interval(op_time);
                     r.key = std::to_string(hashed_host_path_query); // Use hashed host path query as key
                     r.value_size = get_value_size(response_size);
 

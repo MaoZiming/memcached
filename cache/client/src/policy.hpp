@@ -20,12 +20,15 @@
 #include <ostream>
 #include <iostream>
 #include <cassert>
+// #include <grpcpp/grpcpp.h>
+// #include "../include/workload.hpp"
+
 class Tracker
 {
 public:
     virtual void write(const std::string &key) = 0;
     virtual void read(const std::string &key) = 0;
-    virtual double get_ew(const std::string &key) = 0;
+    virtual double get_ew(const std::string &key, int idx) = 0;
     virtual size_t get_storage_overhead(void) const = 0;
     virtual void update(int num_keys) = 0;
     // New method to report average latencies
@@ -47,6 +50,8 @@ public:
         return "N.A.";
     }
 
+    bool is_oracle = false;
+
 protected:
     mutable std::shared_mutex mutex_; // Mutex for protecting data
     // Tracking latency in milliseconds
@@ -60,13 +65,27 @@ protected:
     mutable size_t get_ew_count_ = 0;
 };
 
+class OracleTracker : public Tracker
+{
+public:
+    OracleTracker()
+    {
+        is_oracle = true;
+    }
+    void write(const std::string &key) override;
+    void read(const std::string &key) override;
+    double get_ew(const std::string &key, int idx) override;
+    size_t get_storage_overhead(void) const override;
+    void update(int num_keys) override {};
+};
+
 class EveryKeyTracker : public Tracker
 {
 public:
     EveryKeyTracker() {}
     void write(const std::string &key) override;
     void read(const std::string &key) override;
-    double get_ew(const std::string &key) override;
+    double get_ew(const std::string &key, int idx) override;
     size_t get_storage_overhead(void) const override;
     void update(int num_keys) override {};
 
@@ -382,7 +401,7 @@ public:
     }
     void write(const std::string &key) override;
     void read(const std::string &key) override;
-    double get_ew(const std::string &key) override;
+    double get_ew(const std::string &key, int idx) override;
     size_t get_storage_overhead(void) const override;
 
     std::string is_in_topK(std::string key) override
@@ -411,7 +430,7 @@ public:
 
     void write(const std::string &key) override;
     void read(const std::string &key) override;
-    double get_ew(const std::string &key) override;
+    double get_ew(const std::string &key, int idx) override;
     size_t get_storage_overhead(void) const override;
 
 private:
@@ -444,7 +463,7 @@ public:
     ExactRWTracker() {}
     void write(const std::string &key) override;
     void read(const std::string &key) override;
-    double get_ew(const std::string &key) override;
+    double get_ew(const std::string &key, int idx) override;
     size_t get_storage_overhead(void) const override;
     void update(int num_keys) override {};
 
@@ -471,7 +490,7 @@ public:
     }
     void write(const std::string &key) override;
     void read(const std::string &key) override;
-    double get_ew(const std::string &key) override;
+    double get_ew(const std::string &key, int idx) override;
     size_t get_storage_overhead(void) const override;
 
     std::string is_in_topK(std::string key) override

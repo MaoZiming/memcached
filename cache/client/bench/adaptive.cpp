@@ -25,9 +25,13 @@ int main(int argc, char *argv[])
     //                                   grpc::InsecureChannelCredentials()),
     //               parser.tracker);
 
-    Client client(CACHE_ADDR,
+    // Client client(CACHE_ADDR,
+    //               DB_ADDR,
+    //               5, parser.tracker);
+
+    Client client(CACHE_ADDRESSES,
                   DB_ADDR,
-                  5, parser.tracker);
+                  parser.tracker);
 
     float ew = ADAPTIVE_EW;
     int ttl = LONG_TTL;

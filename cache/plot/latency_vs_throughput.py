@@ -31,9 +31,9 @@ plt.rc("figure", titlesize=BIG_SIZE)
 # Create output dir if it doesn't exist
 os.makedirs(output_dir, exist_ok=True)
 
-BENCHMARKS = ["stale_bench",  "ttl_bench", "invalidate_bench", "update_bench", "adaptive_bench"]
-DATASETS = ["IBM"]
-SCALES = list(range(10, 500, 10))
+BENCHMARKS = ["stale_bench",  "ttl_bench", "invalidate_bench", "update_bench", "adaptive_bench", "oracle_bench"]
+DATASETS = ["PoissonMix", "Poisson", "PoissonWrite", "Tencent", "IBM", "Alibaba"]
+SCALES = list(range(200))
 
 dataset_to_reqs = {
     "Meta": 500000,
@@ -52,6 +52,7 @@ benchmark_to_print_name = {
     "invalidate_bench": "Inv.", 
     "update_bench": "Upd.",
     "adaptive_bench": "Adpt.",
+    "oracle_bench": "Oracle",
 }
 
 
@@ -78,8 +79,10 @@ def find_latest_log(benchmark, dataset, scale_):
 
 
 log_pattern = re.compile(
-    r"Average cache latency: ([\d.]+) ms\s+"
-    r"Average DB latency: ([\d.]+) ms\s+"
+    r"Average cache latency: ([\d.]+) us\s+"
+    r"Average DB latency: ([\d.]+) us\s+"
+    r"Median cache latency: ([\d.]+) us\s+"
+    r"Median DB latency: ([\d.]+) us\s+"
     r"End-to-End Latency: ([\d.]+) ms\s+"
     r"Num operations: (\d+)"
 )
@@ -99,10 +102,13 @@ for dataset in DATASETS:
                 # Search for the pattern in the entire log content
                 match = log_pattern.search(log_content)
                 if match:
-                    cache_latency = float(match.group(1))
-                    db_latency = float(match.group(2))
-                    end_to_end_latency = float(match.group(3))
-                    num_operations = int(match.group(4))
+                    # cache_latency = float(match.group(1))  # Average cache latency
+                    # db_latency = float(match.group(2))     # Average DB latency
+                    
+                    cache_latency = float(match.group(3))  # Median cache latency
+                    db_latency = float(match.group(4))     # Median DB latency
+                    end_to_end_latency = float(match.group(5))
+                    num_operations = int(match.group(6))
 
                     # Calculate throughput
                     throughput = num_operations / (end_to_end_latency / 1000)  # convert ms to seconds
@@ -111,10 +117,13 @@ for dataset in DATASETS:
                     data["Benchmark"].append(benchmark)
                     data["Dataset"].append(dataset)
                     data["Scale"].append(scale)
-                    data["Cache Latency"].append(cache_latency)
-                    data["DB Latency"].append(db_latency)
+                    data["Cache Latency"].append(cache_latency / 1000)
+                    data["DB Latency"].append(db_latency  / 1000)
                     data["End-to-End Latency"].append(end_to_end_latency)
                     data["Throughput"].append(throughput)
+
+    if not data["Scale"]:
+        continue
 
     # Convert the data to a DataFrame for easier handling
     df = pd.DataFrame(data)
@@ -131,7 +140,7 @@ for dataset in DATASETS:
             subset = subset.sort_values(by='Scale')
 
             # Plot the line and points, connecting points with a line
-            plt.plot(subset['Throughput'] / max_throughput * 100, subset[keyword], label=f'{benchmark_to_print_name[benchmark]}',marker=markers[i % len(markers)])
+            plt.plot(subset['Throughput'] / max_throughput * 100, subset[keyword], label=f'{benchmark_to_print_name[benchmark]}', marker=markers[i % len(markers)])
             
             # Add scale as text labels on top of the points
             for j, scale in enumerate(subset['Scale']):
@@ -147,6 +156,7 @@ for dataset in DATASETS:
         plt.ylabel(x_title)
         plt.legend()
         plt.tight_layout()
+        # plt.ylim(2,10)
         if is_log:
             plt.yscale('log')
 
@@ -154,7 +164,7 @@ for dataset in DATASETS:
         plt.savefig(f'{dataset}_Throughput_vs_{keyword}.pdf')
         plt.figure(figsize=FIGSIZE)
 
-    plot_figure('Cache Latency', 'Read Latency (ms)', True)
+    plot_figure('Cache Latency', 'Read Latency (ms)', False)
     plot_figure('DB Latency', 'Write Latency (ms)', False)
 
     data = {"Benchmark": [], "Dataset": [], "Scale": [], "Cache Latency": [], "DB Latency": [], "End-to-End Latency": [], "Throughput": []}

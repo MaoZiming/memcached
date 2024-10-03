@@ -14,11 +14,10 @@ set(SOURCES
     src/client.hpp
     # src/load_tracker.hpp
     src/load_tracker.cpp
-
+    include/workload.hpp
     include/tqdm.hpp
     include/zipf.hpp
     include/benchmark.hpp
-    include/workload.hpp
     include/parser.hpp
 )
 
@@ -70,6 +69,12 @@ add_executable(
 )
 
 add_executable(
+    oracle_bench
+    bench/oracle.cpp
+    ${SOURCES}
+)
+
+add_executable(
     dataset
     bench/dataset.cpp
     ${SOURCES}
@@ -94,6 +99,14 @@ target_link_libraries(ttl_bench
     /usr/local/lib/libmemcached.so
     /usr/local/lib/libmemcachedutil.so
 )
+
+target_link_libraries(oracle_bench
+    PRIVATE
+    myproto
+    /usr/local/lib/libmemcached.so
+    /usr/local/lib/libmemcachedutil.so
+)
+
 
 target_link_libraries(invalidate_bench
     PRIVATE

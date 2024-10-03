@@ -24,6 +24,10 @@ using grpc::ServerCompletionQueue;
 using grpc::ServerContext;
 using grpc::Status;
 
+using freshCache::CacheInvalidateRequest;
+using freshCache::CacheInvalidateResponse;
+using freshCache::CacheUpdateRequest;
+using freshCache::CacheUpdateResponse;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;

@@ -17,11 +17,8 @@ int main(int argc, char *argv[])
 {
     Parser parser(argc, argv);
 
-    // Create a channel to connect to the server
-    Client client(grpc::CreateChannel(CACHE_ADDR,
-                                      grpc::InsecureChannelCredentials()),
-                  grpc::CreateChannel(DB_ADDR,
-                                      grpc::InsecureChannelCredentials()),
+    Client client(CACHE_ADDRESSES,
+                  DB_ADDR,
                   nullptr);
 
     float ew = UPDATE_EW;

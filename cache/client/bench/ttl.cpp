@@ -24,9 +24,10 @@ int main(int argc, char *argv[])
     //                                   grpc::InsecureChannelCredentials()),
     //               nullptr);
 
-    Client client(CACHE_ADDR,
+    Client client(CACHE_ADDRESSES,
                   DB_ADDR,
-                  5, parser.tracker);
+                  nullptr);
+
 
     float ew = TTL_EW;
     int ttl = 1;

@@ -31,9 +31,10 @@ plt.rc("figure", titlesize=BIG_SIZE)
 # Create output dir if it doesn't exist
 os.makedirs(output_dir, exist_ok=True)
 
-BENCHMARKS = ["stale_bench",  "ttl_bench", "invalidate_bench", "update_bench", "adaptive_bench"]
-DATASETS = ["IBM"]
-SCALES = list(range(10, 500, 10))
+BENCHMARKS = ["stale_bench",  "ttl_bench", "invalidate_bench", "update_bench", "adaptive_bench", "oracle_bench"]
+DATASETS = ["IBM", "Meta", "Twitter", "PoissonMix", "Tencent", "Alibaba", "Poisson"]
+DATASETS = ["Poisson", "PoissonMix", "PoissonWrite", "Tencent"]
+SCALES = list(range(1001))
 
 dataset_to_reqs = {
     "Meta": 500000,
@@ -43,7 +44,7 @@ dataset_to_reqs = {
     "Alibaba": 300000,
     "Poisson": 200000,
     "PoissonWrite": 200000,
-    "PoissonMix": 200000
+    "PoissonMix": 200000,
 }
 
 benchmark_to_print_name = {
@@ -52,6 +53,7 @@ benchmark_to_print_name = {
     "invalidate_bench": "Inv.", 
     "update_bench": "Upd.",
     "adaptive_bench": "Adpt.",
+    "oracle_bench": "Oracle",
 }
 
 
@@ -85,7 +87,7 @@ log_pattern = re.compile(
     r"DB current_rpcs: (\d+), Cache current_rpcs: (\d+)"
 )
 
-max_times_data = {"Benchmark": [], "Dataset": [], "Throughput": [], "Scale": [], "CPU": [], "NW": [], "Disk": [], "db_current_rpcs": [], "cache_current_rpcs": []}
+data = {"Benchmark": [], "Dataset": [], "Throughput": [], "Scale": [], "CPU": [], "NW": [], "Disk": [], "db_current_rpcs": [], "cache_current_rpcs": []}
 
 def get_throughput(dataset, time): 
     return dataset_to_reqs[dataset] / time
@@ -137,26 +139,29 @@ for dataset in DATASETS:
                             print(line)
                                                         
                 if not timestamps:
-                    print(f"No data found in {log_file}")
+                    # print(f"No data found in {log_file}")
                     continue
 
                 start_time = timestamps[0]
                 relative_times = [(ts - start_time).total_seconds() for ts in timestamps]
                 
-                max_times_data['Benchmark'].append(benchmark)
-                max_times_data['Dataset'].append(dataset)
-                max_times_data['Throughput'].append(get_throughput(dataset, max(relative_times)))
-                max_times_data['Scale'].append(scale)
-                max_times_data['NW'].append(sum(network_total_mb[2:-2]) / len(network_total_mb[2:-2]))
-                max_times_data["CPU"].append(sum(cpu_utilizations[2:-2]) / len(cpu_utilizations[2:-2]))
-                max_times_data["Disk"].append(sum(disk_total_mb[2:-2]) / len(disk_total_mb[2:-2]))
-                max_times_data["cache_current_rpcs"].append(max(1, sum(cache_current_rpcs_list[2:-2]) / len(cache_current_rpcs_list[2:-2])))
-                max_times_data['db_current_rpcs'].append(max(1, sum(db_current_rpcs_list[2:-2]) / len(db_current_rpcs_list[2:-2])))
-                
-    print(max_times_data)
+                data['Benchmark'].append(benchmark)
+                data['Dataset'].append(dataset)
+                data['Throughput'].append(get_throughput(dataset, max(relative_times)))
+                data['Scale'].append(scale)
+                data['NW'].append(sum(network_total_mb[2:-2]) / len(network_total_mb[2:-2]))
+                data["CPU"].append(sum(cpu_utilizations[2:-2]) / len(cpu_utilizations[2:-2]))
+                data["Disk"].append(sum(disk_total_mb[2:-2]) / len(disk_total_mb[2:-2]))
+                data["cache_current_rpcs"].append(max(1, sum(cache_current_rpcs_list[2:-2]) / len(cache_current_rpcs_list[2:-2])))
+                data['db_current_rpcs'].append(max(1, sum(db_current_rpcs_list[2:-2]) / len(db_current_rpcs_list[2:-2])))
+  
+    if not data["Scale"]:
+        continue
+              
+    print(data)
 
     # Convert the data to a DataFrame for easier handling
-    df = pd.DataFrame(max_times_data)
+    df = pd.DataFrame(data)
 
     # Group by benchmark
     benchmarks = df['Benchmark'].unique()
@@ -205,7 +210,7 @@ for dataset in DATASETS:
     plot_figure('NW', 'Avg. NW Usage (MB/s)')
     # plot_figure('Disk', 'Avg. Disk Usage (MB/s)')
     # plot_figure('num_active_connections', '# active conn.')
-    # plot_figure('db_current_rpcs', '# ongoing RPCs (to DB)')
-    plot_figure('cache_current_rpcs', '# ongoing RPCs (to cache)', True)
+    plot_figure('db_current_rpcs', '# ongoing RPCs (to DB)', False)
+    plot_figure('cache_current_rpcs', '# ongoing RPCs (to cache)', False)
 
-    max_times_data = {"Benchmark": [], "Dataset": [], "Throughput": [], "Scale": [], "CPU": [], "NW": [], "Disk": [], "db_current_rpcs": [], "cache_current_rpcs": []}
+    data = {"Benchmark": [], "Dataset": [], "Throughput": [], "Scale": [], "CPU": [], "NW": [], "Disk": [], "db_current_rpcs": [], "cache_current_rpcs": []}

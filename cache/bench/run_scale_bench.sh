@@ -14,11 +14,12 @@ DB_VM_LOG_DIR="/home/maoziming/rocksdb/backend/build/logs"
 CACHE_VM_LOG_DIR="/home/maoziming/memcached/cache/build/logs"
 DB_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$DB_VM_IP"
 CACHE_VM_SSH="ssh -i $DB_VM_KEY $DB_VM_USER@$CACHE_VM_IP"
-# BENCHMARKS=("ttl_bench" "adaptive_bench" "invalidate_bench" "update_bench" "stale_bench")
-BENCHMARKS=("ttl_bench" "stale_bench" "adaptive_bench")
-DATASETS=("IBM") # 100 is about right. 
-# SCALES=("100" "90" "80" "70" "60" "50" "40" "30")
-SCALES=("100")
+BENCHMARKS=("ttl_bench" "adaptive_bench" "invalidate_bench" "update_bench" "stale_bench")
+
+SCALES=("1" "2" "3" "5" "10")
+DATASETS=("Poisson")
+BENCHMARKS=("oracle_bench")
+
 cd /home/maoziming/memcached/cache/build/
 make -j
 
@@ -36,8 +37,8 @@ $CACHE_VM_SSH "pkill memcached"
 
 # Loop over each benchmark and dataset combination
 for DATASET in "${DATASETS[@]}"; do
-    for BENCHMARK in "${BENCHMARKS[@]}"; do
-        for SCALE in "${SCALES[@]}"; do
+    for SCALE in "${SCALES[@]}"; do
+        for BENCHMARK in "${BENCHMARKS[@]}"; do
             # Step 1: Start fresh memcached on Cache VM
             echo "Starting fresh memcached on Cache VM..."
             $CACHE_VM_SSH "sudo pkill memcached"

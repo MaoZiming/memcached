@@ -3,6 +3,27 @@
 #include <shared_mutex> // C++17
 #include <mutex>
 
+void OracleTracker::write(const std::string &key)
+{
+    return;
+}
+
+void OracleTracker::read(const std::string &key)
+{
+    return;
+}
+
+size_t OracleTracker::get_storage_overhead(void) const
+{
+    return 0;
+}
+
+double OracleTracker::get_ew(const std::string &key, int idx)
+{
+    assert(false);
+    return -1;
+}
+
 void EveryKeyTracker::write(const std::string &key)
 {
     auto start = std::chrono::high_resolution_clock::now();
@@ -18,7 +39,7 @@ void EveryKeyTracker::write(const std::string &key)
     write_count_++;                    // Increment write count
 }
 
-double EveryKeyTracker::get_ew(const std::string &key)
+double EveryKeyTracker::get_ew(const std::string &key, int idx)
 {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -100,7 +121,7 @@ void TopKSketchTracker::read(const std::string &key)
     read_count_++;                    // Increment read count
 }
 
-double TopKSketchTracker::get_ew(const std::string &key)
+double TopKSketchTracker::get_ew(const std::string &key, int idx)
 {
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -157,7 +178,7 @@ void MinSketchTracker::read(const std::string &key)
     read_count_++;                    // Increment read count
 }
 
-double MinSketchTracker::get_ew(const std::string &key)
+double MinSketchTracker::get_ew(const std::string &key, int idx)
 {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -200,7 +221,7 @@ void ExactRWTracker::write(const std::string &key)
     write_count_++;                    // Increment write count
 }
 
-double ExactRWTracker::get_ew(const std::string &key)
+double ExactRWTracker::get_ew(const std::string &key, int idx)
 {
     auto start = std::chrono::high_resolution_clock::now();
     std::shared_lock lock(mutex_);
@@ -270,7 +291,7 @@ void TopKSketchSampleTracker::read(const std::string &key)
     read_count_++;                    // Increment read count
 }
 
-double TopKSketchSampleTracker::get_ew(const std::string &key)
+double TopKSketchSampleTracker::get_ew(const std::string &key, int idx)
 {
 
     auto start = std::chrono::high_resolution_clock::now();

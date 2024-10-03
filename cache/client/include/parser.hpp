@@ -35,7 +35,7 @@ public:
 
         std::string workload_str = argv[1];
         scale_factor = (argc >= 3) ? std::stoi(argv[2]) : -1;                  // Default scale factor
-        std::string tracker_str = (argc >= 4) ? argv[3] : "TopKSketchTracker"; // Default tracker
+        std::string tracker_str = (argc >= 4) ? argv[3] : "None"; // Default tracker
 
         log_path = (argc >= 5) ? argv[4] : "test.log";
 
@@ -63,6 +63,10 @@ public:
         else if (tracker_str == "TopKSketchSampleTracker")
         {
             tracker = new TopKSketchSampleTracker();
+        }
+        else if (tracker_str == "None")
+        {
+            tracker = nullptr;
         }
         else
         {

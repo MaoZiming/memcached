@@ -38,16 +38,11 @@ using freshCache::CacheGetMRRequest;
 using freshCache::CacheGetMRResponse;
 using freshCache::CacheGetRequest;
 using freshCache::CacheGetResponse;
-using freshCache::CacheInvalidateRequest;
-using freshCache::CacheInvalidateResponse;
 using freshCache::CacheService;
 using freshCache::CacheSetRequest;
 using freshCache::CacheSetResponse;
 using freshCache::CacheSetTTLRequest;
 using freshCache::CacheSetTTLResponse;
-using freshCache::CacheUpdateRequest;
-using freshCache::CacheUpdateResponse;
-
 using freshCache::DBDeleteRequest;
 using freshCache::DBDeleteResponse;
 using freshCache::DBGetLoadRequest;
@@ -74,12 +69,11 @@ const int TTL_EW = -2;
 const int INVALIDATE_EW = -3;
 const int UPDATE_EW = -4;
 
-// #define USE_RPC_LIMIT
+#define USE_RPC_LIMIT
 
-// #ifdef USE_RPC_LIMIT
-// const int MAX_CONCURRENT_RPCS = 70000;
-// const int MAX_DB_CONCURRENT_RPCS = 100;
-// #endif
+#ifdef USE_RPC_LIMIT
+const int MAX_CONCURRENT_RPCS = 1000;
+#endif
 
 class DBClient
 {
@@ -111,12 +105,14 @@ public:
     std::future<std::string> AsyncGet(const std::string &key)
     {
         // std::cout << "AsyncGet starts" << std::endl;
-        // {
-        // std::unique_lock<std::mutex> lock(mutex_);
-        // cv_.wait(lock, [this]()
-        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         DBGetRequest request;
@@ -242,7 +238,7 @@ public:
         //     std::unique_lock<std::mutex> lock(mutex_);
         //     cv_.wait(lock, [this]()
         //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        ++current_rpcs;
+        //     ++current_rpcs;
         // }
 
         // Create a promise and return a future associated with it
@@ -280,12 +276,11 @@ public:
                         }
 
                         // Decrease the current RPC count and notify the condition variable
-                        // {
-                        //     std::lock_guard<std::mutex> lock(mutex_);
-                        //     --current_rpcs;
-                        // }
-                        // cv_.notify_one();
-                    })
+                        {
+                            std::lock_guard<std::mutex> lock(mutex_);
+                            --current_rpcs;
+                        }
+                        cv_.notify_one(); })
             .detach(); // Detach the thread to avoid blocking
 
         // Return the future so the caller can wait on it
@@ -294,27 +289,20 @@ public:
 
     std::future<bool> AsyncPut(const std::string &key, const std::string &value, float ew)
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         DBPutRequest request;
         request.set_key(key);
         request.set_value(value);
-
-        if (tracker_ && ew == ADAPTIVE_EW)
-        {
-            ew = tracker_->get_ew(key);
-            request.set_ew(ew);
-        }
-        else
-        {
-            request.set_ew(ew);
-        }
+        request.set_ew(ew);
 
         // Call object to store RPC data
         AsyncClientCall *call = new AsyncClientCall;
@@ -358,12 +346,14 @@ public:
     // Modified Delete method using Async pattern
     std::future<bool> AsyncDelete(const std::string &key)
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         DBDeleteRequest request;
@@ -405,12 +395,14 @@ public:
     // Asynchronous GetLoad method returning a future
     std::future<int> AsyncGetLoad()
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         DBGetLoadRequest request;
@@ -450,12 +442,14 @@ public:
     // Asynchronous StartRecord method returning a future
     std::future<bool> AsyncStartRecord()
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         DBStartRecordRequest request;
@@ -497,12 +491,14 @@ public:
     // Asynchronous GetDBReadCount method returning a future
     std::future<int> AsyncGetDBReadCount()
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         DBGetReadCountRequest request;
@@ -542,12 +538,14 @@ public:
     // Asynchronous GetDBWriteCount method returning a future
     std::future<int> AsyncGetDBWriteCount()
     {
-        // {
-        //     std::unique_lock<std::mutex> lock(mutex_);
-        //     cv_.wait(lock, [this]()
-        //              { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         DBGetWriteCountRequest request;
@@ -607,6 +605,32 @@ public:
         return static_cast<double>(total_latency) / latencies_.size();
     }
 
+    double GetMedianLatency()
+    {
+        std::lock_guard<std::mutex> lock(latency_mutex_);
+
+        if (latencies_.empty())
+        {
+            return 0.0; // Avoid division by zero
+        }
+
+        // Create a copy of the latencies_ vector to avoid modifying the original
+        std::vector<long> sorted_latencies = latencies_;
+        std::sort(sorted_latencies.begin(), sorted_latencies.end());
+
+        size_t size = sorted_latencies.size();
+        if (size % 2 == 0)
+        {
+            // If even, return the average of the two middle values
+            return (sorted_latencies[size / 2 - 1] + sorted_latencies[size / 2]) / 2.0;
+        }
+        else
+        {
+            // If odd, return the middle value
+            return sorted_latencies[size / 2];
+        }
+    }
+
     int get_current_rpcs() { return current_rpcs.load(); }
 
 private:
@@ -637,8 +661,11 @@ private:
     }
 
     Tracker *tracker_ = nullptr;
-    // std::mutex mutex_;
+
+#ifdef USE_RPC_LIMIT
+    std::mutex mutex_;
     std::condition_variable cv_;
+#endif
     std::atomic<int> current_rpcs{0};
 
     grpc::CompletionQueue cq_;
@@ -708,8 +735,6 @@ private:
         while (cq_.Next(&got_tag, &ok))
         {
             AsyncClientCall *call = static_cast<AsyncClientCall *>(got_tag);
-
-            --current_rpcs;
 
             if (call->status.ok())
             {
@@ -797,11 +822,15 @@ private:
             }
 
             // Decrement current_rpcs and notify
-            // {
-            // std::lock_guard<std::mutex> lock(mutex_);
-            // }
-            // cv_.notify_one();
-
+            {
+#ifdef USE_RPC_LIMIT
+                std::lock_guard<std::mutex> lock(mutex_);
+#endif
+                --current_rpcs;
+            }
+#ifdef USE_RPC_LIMIT
+            cv_.notify_one();
+#endif
             delete call;
         }
     }
@@ -831,6 +860,18 @@ public:
         cq_thread_ = std::thread(&CacheClient::AsyncCompleteRpc, this);
     }
 
+    CacheClient(std::vector<std::string> cache_addresses)
+    {
+        std::cout << "Created " << cache_addresses.size() << " CacheClient stubs" << std::endl;
+
+        for (auto cache_address : cache_addresses)
+        {
+            auto channel = grpc::CreateChannel(cache_address, grpc::InsecureChannelCredentials());
+            stubs_.push_back(CacheService::NewStub(channel));
+        }
+        cq_thread_ = std::thread(&CacheClient::AsyncCompleteRpc, this);
+    }
+
     ~CacheClient()
     {
         // Shutdown the completion queue and join the thread
@@ -848,14 +889,14 @@ public:
     std::future<std::string> GetAsync(const std::string &key)
     {
         // std::cout << "Start AsyncGet: " << key << std::endl;
-        // {
-        // #ifdef USE_RPC_LIMIT
-        // std::unique_lock<std::mutex> lock(mutex_);
-        // cv_.wait(lock, [this]()
-        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        // #endif
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         CacheGetRequest request;
@@ -873,7 +914,7 @@ public:
 
         // Start the asynchronous RPC
         // std::cout << "Before AsyncGet: " << key << std::endl;
-        call->get_response_reader = get_stub()->AsyncGet(&call->context, request, &cq_);
+        call->get_response_reader = get_stub(key)->AsyncGet(&call->context, request, &cq_);
         call->get_response_reader->Finish(&call->get_reply, &call->status, (void *)call);
         // std::cout << "After AsyncGet: " << key << std::endl;
 
@@ -883,14 +924,14 @@ public:
     // Asynchronous Set method returning a future
     std::future<bool> SetAsync(const std::string &key, const std::string &value, int ttl)
     {
-        // {
-        // #ifdef USE_RPC_LIMIT
-        // std::unique_lock<std::mutex> lock(mutex_);
-        // cv_.wait(lock, [this]()
-        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        // #endif
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         CacheSetRequest request;
@@ -909,75 +950,43 @@ public:
         std::future<bool> result_future = call->set_promise->get_future();
 
         // Start the asynchronous RPC
-        call->set_response_reader = get_stub()->AsyncSet(&call->context, request, &cq_);
+        call->set_response_reader = get_stub(key)->AsyncSet(&call->context, request, &cq_);
         call->set_response_reader->Finish(&call->set_reply, &call->status, (void *)call);
 
         return result_future;
     }
 
-    // Asynchronous Invalidate method returning a future
-    std::future<bool> InvalidateAsync(const std::string &key)
+    // Asynchronous Set method returning a future
+    std::future<bool> SetAsyncWarm(CacheService::Stub *stub, const std::string &key, const std::string &value, int ttl)
     {
-        // {
-        // #ifdef USE_RPC_LIMIT
-        // std::unique_lock<std::mutex> lock(mutex_);
-        // cv_.wait(lock, [this]()
-        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        // #endif
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
-        CacheInvalidateRequest request;
-        request.set_key(key);
-
-        // Call object to store RPC data
-        AsyncClientCall *call = new AsyncClientCall;
-        call->call_type = AsyncClientCall::CallType::INVALIDATE;
-        call->key = key;
-        call->invalidate_promise = std::make_shared<std::promise<bool>>();
-        // call->start_time = std::chrono::steady_clock::now();
-
-        // Get the future from the promise
-        std::future<bool> result_future = call->invalidate_promise->get_future();
-
-        // Start the asynchronous RPC
-        call->invalidate_response_reader = get_stub()->AsyncInvalidate(&call->context, request, &cq_);
-        call->invalidate_response_reader->Finish(&call->invalidate_reply, &call->status, (void *)call);
-
-        return result_future;
-    }
-
-    // Asynchronous Update method returning a future
-    std::future<bool> UpdateAsync(const std::string &key, const std::string &value, int ttl)
-    {
-        // {
-        // #ifdef USE_RPC_LIMIT
-        // std::unique_lock<std::mutex> lock(mutex_);
-        // cv_.wait(lock, [this]()
-        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        // #endif
-        ++current_rpcs;
-        // }
-
-        // Build the request
-        CacheUpdateRequest request;
+        CacheSetRequest request;
         request.set_key(key);
         request.set_value(value);
+        request.set_ttl(ttl);
 
         // Call object to store RPC data
         AsyncClientCall *call = new AsyncClientCall;
-        call->call_type = AsyncClientCall::CallType::UPDATE;
+        call->call_type = AsyncClientCall::CallType::SET;
         call->key = key;
-        call->update_promise = std::make_shared<std::promise<bool>>();
+        call->set_promise = std::make_shared<std::promise<bool>>();
         // call->start_time = std::chrono::steady_clock::now();
 
         // Get the future from the promise
-        std::future<bool> result_future = call->update_promise->get_future();
+        std::future<bool> result_future = call->set_promise->get_future();
 
         // Start the asynchronous RPC
-        call->update_response_reader = get_stub()->AsyncUpdate(&call->context, request, &cq_);
-        call->update_response_reader->Finish(&call->update_reply, &call->status, (void *)call);
+        call->set_response_reader = stub->AsyncSet(&call->context, request, &cq_);
+        call->set_response_reader->Finish(&call->set_reply, &call->status, (void *)call);
 
         return result_future;
     }
@@ -985,14 +994,14 @@ public:
     // Asynchronous SetTTL method returning a future
     std::future<bool> SetTTLAsync(int32_t ttl)
     {
-        // {
-        // #ifdef USE_RPC_LIMIT
-        // std::unique_lock<std::mutex> lock(mutex_);
-        // cv_.wait(lock, [this]()
-        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        // #endif
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         CacheSetTTLRequest request;
@@ -1014,17 +1023,49 @@ public:
         return result_future;
     }
 
+    // Asynchronous SetTTL method returning a future
+    std::future<bool> SetTTLAsync(CacheService::Stub *stub, int32_t ttl)
+    {
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
+
+        // Build the request
+        CacheSetTTLRequest request;
+        request.set_ttl(ttl);
+
+        // Call object to store RPC data
+        AsyncClientCall *call = new AsyncClientCall;
+        call->call_type = AsyncClientCall::CallType::SETTTL;
+        call->set_ttl_promise = std::make_shared<std::promise<bool>>();
+        // call->start_time = std::chrono::steady_clock::now();
+
+        // Get the future from the promise
+        std::future<bool> result_future = call->set_ttl_promise->get_future();
+
+        // Start the asynchronous RPC
+        call->set_ttl_response_reader = stub->AsyncSetTTL(&call->context, request, &cq_);
+        call->set_ttl_response_reader->Finish(&call->set_ttl_reply, &call->status, (void *)call);
+
+        return result_future;
+    }
+
     // Asynchronous GetMR method returning a future
     std::future<float> GetMRAsync()
     {
-        // {
-        // #ifdef USE_RPC_LIMIT
-        // std::unique_lock<std::mutex> lock(mutex_);
-        // cv_.wait(lock, [this]()
-        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        // #endif
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         CacheGetMRRequest request;
@@ -1045,16 +1086,47 @@ public:
         return result_future;
     }
 
+    // Asynchronous GetMR method returning a future
+    std::future<float> GetMRAsync(CacheService::Stub *stub)
+    {
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
+
+        // Build the request
+        CacheGetMRRequest request;
+
+        // Call object to store RPC data
+        AsyncClientCall *call = new AsyncClientCall;
+        call->call_type = AsyncClientCall::CallType::GETMR;
+        call->get_mr_promise = std::make_shared<std::promise<float>>();
+        // call->start_time = std::chrono::steady_clock::now();
+
+        // Get the future from the promise
+        std::future<float> result_future = call->get_mr_promise->get_future();
+
+        // Start the asynchronous RPC
+        call->get_mr_response_reader = stub->AsyncGetMR(&call->context, request, &cq_);
+        call->get_mr_response_reader->Finish(&call->get_mr_reply, &call->status, (void *)call);
+
+        return result_future;
+    }
+
     std::future<std::tuple<int, int>> GetFreshnessStatsAsync()
     {
-        // {
-        // #ifdef USE_RPC_LIMIT
-        // std::unique_lock<std::mutex> lock(mutex_);
-        // cv_.wait(lock, [this]()
-        //          { return current_rpcs < MAX_CONCURRENT_RPCS; });
-        // #endif
-        ++current_rpcs;
-        // }
+        {
+#ifdef USE_RPC_LIMIT
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this]()
+                     { return current_rpcs < MAX_CONCURRENT_RPCS; });
+#endif
+            ++current_rpcs;
+        }
 
         // Build the request
         CacheGetFreshnessStatsRequest request;
@@ -1091,7 +1163,7 @@ public:
     }
 
     // Synchronous Set method that waits for the result
-    bool Set(const std::string &key, const std::string &value, int ttl)
+    bool Set(const std::string &key, const std::string &value, int ttl, bool warm = false)
     {
         try
         {
@@ -1105,32 +1177,30 @@ public:
         }
     }
 
-    // Synchronous Invalidate method that waits for the result
-    bool Invalidate(const std::string &key)
+    // Synchronous Set method that waits for the result
+    bool SetWarm(const std::string &key, const std::string &value, int ttl, bool warm = false)
     {
         try
         {
-            std::future<bool> result_future = InvalidateAsync(key);
-            return result_future.get(); // Wait for the result
-        }
-        catch (const std::exception &e)
-        {
-            std::cerr << "Invalidate failed: " << e.what() << std::endl;
-            return false;
-        }
-    }
+            for (size_t i = 0; i < stubs_.size(); ++i)
+            {
+                CacheService::Stub *stub = get_stub();
+                if (!stub)
+                {
+                    throw std::runtime_error("No stub available");
+                }
 
-    // Synchronous Update method that waits for the result
-    bool Update(const std::string &key, const std::string &value, int ttl)
-    {
-        try
-        {
-            std::future<bool> result_future = UpdateAsync(key, value, ttl);
-            return result_future.get(); // Wait for the result
+                // Initiate the async request
+                std::future<bool> result_future = SetAsyncWarm(stub, key, value, ttl);
+
+                // Block until the future is resolved
+                result_future.get();
+            }
+            return true;
         }
         catch (const std::exception &e)
         {
-            std::cerr << "Update failed: " << e.what() << std::endl;
+            std::cerr << "Set failed: " << e.what() << std::endl;
             return false;
         }
     }
@@ -1140,8 +1210,21 @@ public:
     {
         try
         {
-            std::future<bool> result_future = SetTTLAsync(ttl);
-            return result_future.get(); // Wait for the result
+            for (size_t i = 0; i < stubs_.size(); ++i)
+            {
+                CacheService::Stub *stub = get_stub();
+                if (!stub)
+                {
+                    throw std::runtime_error("No stub available");
+                }
+
+                // Initiate the async request
+                std::future<bool> result_future = SetTTLAsync(stub, ttl);
+
+                // Block until the future is resolved
+                result_future.get();
+            }
+            return true;
         }
         catch (const std::exception &e)
         {
@@ -1155,27 +1238,64 @@ public:
     {
         try
         {
-            std::future<float> result_future = GetMRAsync();
-            return result_future.get(); // Wait for the result
+            float total_mr = 0.0f;
+            size_t stub_count = stubs_.size();
+
+            // Loop through all stubs to get their MR and accumulate the result
+            for (size_t i = 0; i < stub_count; ++i)
+            {
+                CacheService::Stub *stub = get_stub();
+                if (!stub)
+                {
+                    throw std::runtime_error("No stub available");
+                }
+
+                // Initiate the async request
+                std::future<float> result_future = GetMRAsync(stub);
+
+                // Block until the future is resolved and add the result to total
+                total_mr += result_future.get();
+            }
+
+            // Calculate the average MR
+            return stub_count > 0 ? total_mr / static_cast<float>(stub_count) : -1.0f;
         }
         catch (const std::exception &e)
         {
             std::cerr << "GetMR failed: " << e.what() << std::endl;
-            return -1.0;
+            return -1.0f; // Return -1.0 in case of failure
         }
     }
 
     std::tuple<int, int> GetFreshnessStats()
     {
+        std::tuple<int, int> result;
         try
         {
-            std::future<std::tuple<int, int>> result_future = GetFreshnessStatsAsync();
-            return result_future.get(); // Wait for the result
+            for (size_t i = 0; i < stubs_.size(); ++i)
+            {
+                CacheService::Stub *stub = get_stub();
+                if (!stub)
+                {
+                    throw std::runtime_error("No stub available");
+                }
+
+                // Initiate the async request
+                std::future<std::tuple<int, int>> result_future = GetFreshnessStatsAsync();
+
+                // Block until the future is resolved and get the result
+                std::tuple<int, int> current_result = result_future.get();
+
+                // Add the values to the result
+                std::get<0>(result) += std::get<0>(current_result);
+                std::get<1>(result) += std::get<1>(current_result);
+            }
+            return result;
         }
         catch (const std::exception &e)
         {
             std::cerr << "GetFreshnessStats failed: " << e.what() << std::endl;
-            return std::make_tuple(-1, -1); // Return error values
+            return std::make_tuple(-1, -1);
         }
     }
 
@@ -1195,7 +1315,7 @@ public:
     double GetAverageLatency()
     {
         std::lock_guard<std::mutex> lock(latency_mutex_);
-        std::cerr << "GetAverageLatency: " << latencies_.size() << std::endl;
+        // std::cerr << "GetAverageLatency: " << latencies_.size() << std::endl;
 
         if (latencies_.empty())
         {
@@ -1208,6 +1328,34 @@ public:
             total_latency += latency;
         }
         return static_cast<double>(total_latency) / latencies_.size();
+    }
+
+    // Function to calculate median latency
+    double GetMedianLatency()
+    {
+        std::lock_guard<std::mutex> lock(latency_mutex_);
+        std::cerr << "GetMedianLatency: " << latencies_.size() << std::endl;
+
+        if (latencies_.empty())
+        {
+            return 0.0; // Avoid division by zero
+        }
+
+        // Create a copy of the latencies_ vector to avoid modifying the original
+        std::vector<long> sorted_latencies = latencies_;
+        std::sort(sorted_latencies.begin(), sorted_latencies.end());
+
+        size_t size = sorted_latencies.size();
+        if (size % 2 == 0)
+        {
+            // If even, return the average of the two middle values
+            return (sorted_latencies[size / 2 - 1] + sorted_latencies[size / 2]) / 2.0;
+        }
+        else
+        {
+            // If odd, return the middle value
+            return sorted_latencies[size / 2];
+        }
     }
 
 private:
@@ -1246,16 +1394,6 @@ private:
         std::unique_ptr<grpc::ClientAsyncResponseReader<CacheSetResponse>> set_response_reader;
         std::shared_ptr<std::promise<bool>> set_promise;
 
-        // For InvalidateAsync
-        CacheInvalidateResponse invalidate_reply;
-        std::unique_ptr<grpc::ClientAsyncResponseReader<CacheInvalidateResponse>> invalidate_response_reader;
-        std::shared_ptr<std::promise<bool>> invalidate_promise;
-
-        // For UpdateAsync
-        CacheUpdateResponse update_reply;
-        std::unique_ptr<grpc::ClientAsyncResponseReader<CacheUpdateResponse>> update_response_reader;
-        std::shared_ptr<std::promise<bool>> update_promise;
-
         // For SetTTLAsync
         CacheSetTTLResponse set_ttl_reply;
         std::unique_ptr<grpc::ClientAsyncResponseReader<CacheSetTTLResponse>> set_ttl_response_reader;
@@ -1280,10 +1418,10 @@ private:
     grpc::CompletionQueue cq_;
     std::thread cq_thread_;
 
-#ifdef USE_RPC_LIMIT
-    std::mutex mutex_;
-    std::condition_variable cv_;
-#endif
+    // #ifdef USE_RPC_LIMIT
+    // std::mutex mutex_;
+    // std::condition_variable cv_;
+    // #endif
 
     std::unique_ptr<CacheService::Stub> stub_;
     std::vector<std::unique_ptr<CacheService::Stub>> stubs_;
@@ -1300,6 +1438,27 @@ private:
             // Use round-robin to select a stub from stubs_
             size_t current_stub_index = stub_counter.fetch_add(1) % stubs_.size();
             return stubs_[current_stub_index].get();
+        }
+
+        // Handle the case where both stub_ and stubs_ are empty
+        std::cerr << "Error: No stub available!" << std::endl;
+        return nullptr;
+    }
+
+    CacheService::Stub *get_stub(const std::string &key)
+    {
+        if (stub_)
+        {
+            // Return stub_ if it exists
+            return stub_.get();
+        }
+        else if (!stubs_.empty())
+        {
+            // Hash the key and use the result to select a stub from stubs_
+            std::hash<std::string> hash_fn;
+            size_t hash_value = hash_fn(key);
+            size_t stub_index = hash_value % stubs_.size();
+            return stubs_[stub_index].get();
         }
 
         // Handle the case where both stub_ and stubs_ are empty
@@ -1357,10 +1516,24 @@ private:
         while (cq_.Next(&got_tag, &ok))
         {
             AsyncClientCall *call = static_cast<AsyncClientCall *>(got_tag);
-            --current_rpcs;
             if (call->call_type == AsyncClientCall::CallType::GET)
             {
+                if (call->start_time == std::chrono::steady_clock::time_point())
+                {
+                    // start_time is not set, handle accordingly
+                    std::cerr << "Warning: start_time is not set!" << std::endl;
+                    return;
+                }
                 auto end_time = std::chrono::steady_clock::now();
+
+                // Print start and end time as raw durations since epoch
+                // std::cout << "Start time (since epoch): "
+                //           << std::chrono::duration_cast<std::chrono::milliseconds>(call->start_time.time_since_epoch()).count()
+                //           << " ms\n";
+                // std::cout << "End time (since epoch): "
+                //           << std::chrono::duration_cast<std::chrono::milliseconds>(end_time.time_since_epoch()).count()
+                //           << " ms\n";
+
                 auto latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - call->start_time).count();
                 {
                     std::lock_guard<std::mutex> lock(latency_mutex_);
@@ -1384,12 +1557,6 @@ private:
                             break;
                         case AsyncClientCall::CallType::SET:
                             call->set_promise->set_value(call->set_reply.success());
-                            break;
-                        case AsyncClientCall::CallType::INVALIDATE:
-                            call->invalidate_promise->set_value(call->invalidate_reply.success());
-                            break;
-                        case AsyncClientCall::CallType::UPDATE:
-                            call->update_promise->set_value(call->update_reply.success());
                             break;
                         case AsyncClientCall::CallType::SETTTL:
                             call->set_ttl_promise->set_value(call->set_ttl_reply.success());
@@ -1420,14 +1587,6 @@ private:
                             error_message += "SET ";
                             call->set_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
                             break;
-                        case AsyncClientCall::CallType::INVALIDATE:
-                            error_message += "INVALIDATE ";
-                            call->invalidate_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
-                            break;
-                        case AsyncClientCall::CallType::UPDATE:
-                            error_message += "UPDATE ";
-                            call->update_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
-                            break;
                         case AsyncClientCall::CallType::SETTTL:
                             error_message += "SETTTL ";
                             call->set_ttl_promise->set_exception(std::make_exception_ptr(std::runtime_error(error_message)));
@@ -1443,7 +1602,7 @@ private:
                         }
 
                         // Optionally log the error
-                        std::cerr << error_message << " for key: " << call->key << std::endl;
+                        // std::cerr << error_message << " for key: " << call->key << std::endl;
                     }
                 }
                 catch (const std::exception& e)
@@ -1452,6 +1611,18 @@ private:
                     std::cerr << "Exception in thread: " << e.what() << std::endl;
                 }
 
+            {
+#ifdef USE_RPC_LIMIT
+
+                std::lock_guard<std::mutex> lock(mutex_);
+#endif
+                --current_rpcs;
+            }
+#ifdef USE_RPC_LIMIT
+
+            cv_.notify_one();
+#endif
+            
             // Clean up the call object safely
             delete call; });
         }
@@ -1487,6 +1658,23 @@ public:
     void free_mc(memcached_st *memc)
     {
         memcached_pool_push(pool, memc);
+    }
+
+    Client(std::vector<std::string> cache_addresses, std::string db_address, Tracker *tracker)
+        : cache_client_(new CacheClient(cache_addresses)),
+          db_client_(new DBClient(db_address, 1))
+    {
+        if (tracker != nullptr)
+        {
+            cache_client_->SetTracker(tracker);
+            db_client_->SetTracker(tracker);
+        }
+        // memc = create_mc();
+        const char *config_string =
+            "--SERVER=localhost:11211";
+
+        pool = memcached_pool(config_string, strlen(config_string));
+        assert(pool != nullptr);
     }
 
     Client(std::string cache_address, std::string db_address, int num_connections, Tracker *tracker)
@@ -1531,11 +1719,11 @@ public:
         return value;
     }
 
-    void GetAsync(const std::string &key)
+    std::future<std::string> GetAsync(const std::string &key)
     {
         if (get_tracker())
             get_tracker()->read(key);
-        cache_client_->GetAsync(key);
+        return cache_client_->GetAsync(key);
     }
 
     std::string GetWarmDB(const std::string &key)
@@ -1543,11 +1731,11 @@ public:
         return db_client_->Get(key);
     }
 
-    void SetAsync(const std::string &key, const std::string &value, int ttl, float ew)
+    std::future<bool> SetAsync(const std::string &key, const std::string &value, int ttl, float ew)
     {
         if (get_tracker())
             get_tracker()->write(key);
-        db_client_->AsyncPut(key, value, ew);
+        return db_client_->AsyncPut(key, value, ew);
     }
 
     bool Set(const std::string &key, const std::string &value, int ttl, float ew)
@@ -1607,9 +1795,9 @@ public:
         return db_client_->StartRecord();
     }
 
-    bool SetCache(const std::string &key, const std::string &value, int ttl)
+    bool SetCacheWarm(const std::string &key, const std::string &value, int ttl)
     {
-        return cache_client_->Set(key, value, ttl);
+        return cache_client_->SetWarm(key, value, ttl);
     }
 
     Tracker *get_tracker(void)
@@ -1635,6 +1823,16 @@ public:
     double GetDBAverageLatency(void)
     {
         return db_client_->GetAverageLatency();
+    }
+
+    double GetCacheMedianLatency(void)
+    {
+        return cache_client_->GetMedianLatency();
+    }
+
+    double GetDBMedianLatency(void)
+    {
+        return db_client_->GetMedianLatency();
     }
 
 private:

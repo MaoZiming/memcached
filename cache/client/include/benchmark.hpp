@@ -32,6 +32,11 @@ const int C_M = C_I + C_U;
     } while (false)
 
 const std::string CACHE_ADDR = "10.128.0.39:50051";
+
+const std::vector<std::string> CACHE_ADDRESSES = {
+    "10.128.0.39:50051",
+    "10.128.0.40:50051"};
+
 const std::string DB_ADDR = "10.128.0.33:50051";
 int warmup_factor = 5;
 
@@ -61,7 +66,7 @@ void _warm_thread_cache(Client &client, int start, int end, int ttl, float ew, W
     {
         std::string key = workload->get_key(i);
         std::string value = workload->get_value(i);
-        client.SetCache(key, value, ttl); // Need to set for both raeds and writes.
+        client.SetCacheWarm(key, value, ttl); // Need to set for both reads and writes.
     }
 }
 
@@ -104,6 +109,9 @@ void _warm(Client &client, int ttl, float ew, Workload *workload)
 void benchmark_thread_async(Client &client, int start_op, int end_op, int ttl, float ew, Workload *workload)
 {
     // for (int a : tq::trange(end_op - start_op))
+    std::vector<std::future<bool>> set_futures;
+    std::vector<std::future<std::string>> get_futures;
+
     for (int a = 0; a < end_op - start_op; a++)
     {
         int i = a + start_op;
@@ -112,13 +120,53 @@ void benchmark_thread_async(Client &client, int start_op, int end_op, int ttl, f
 
         if (workload->get_is_write(i))
         {
-            client.SetAsync(key, value, ttl, ew);
+            if (client.get_tracker() && client.get_tracker()->is_oracle)
+            {
+                ew = workload->getWriteCountAfterIndex(i);
+                assert(ew > 0);
+            }
+            else if (client.get_tracker() && ew == ADAPTIVE_EW)
+            {
+                ew = client.get_tracker()->get_ew(key, a);
+            }
+
+            set_futures.push_back(client.SetAsync(key, value, ttl, ew));
         }
         else
         {
-            client.GetAsync(key);
+            get_futures.push_back(client.GetAsync(key));
         }
         std::this_thread::sleep_for(workload->get_interval(i));
+    }
+
+    // Wait for all SetAsync futures to complete
+    for (auto &future : set_futures)
+    {
+        try
+        {
+            bool result = future.get();
+            // Optionally process the result
+            // std::cout << "SetAsync result: " << result << std::endl;
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "SetAsync RPC failed: " << e.what() << std::endl;
+        }
+    }
+
+    // Wait for all GetAsync futures to complete
+    for (auto &future : get_futures)
+    {
+        try
+        {
+            std::string value = future.get();
+            // Optionally process the value
+            // std::cout << "GetAsync value: " << value << std::endl;
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "GetAsync RPC failed: " << e.what() << std::endl;
+        }
     }
 }
 
@@ -140,7 +188,7 @@ void benchmark_ew_tracker(Tracker *tracker, Workload *workload)
             std::string key = workload->get_key(i);
             tracker->write(key);
             gold_tracker->write(key);
-            if (tracker->get_ew(key) == gold_tracker->get_ew(key))
+            if (tracker->get_ew(key, i) == gold_tracker->get_ew(key, i))
             {
                 correct += 1;
             }
@@ -148,12 +196,11 @@ void benchmark_ew_tracker(Tracker *tracker, Workload *workload)
             {
                 wrong += 1;
             }
-            if ((C_U * tracker->get_ew(key) > C_I + C_M || tracker->get_ew(key) == -1) == (C_U * gold_tracker->get_ew(key) > C_I + C_M || tracker->get_ew(key) == -1))
+            if ((C_U * tracker->get_ew(key, i) > C_I + C_M || tracker->get_ew(key, i) == -1) == (C_U * gold_tracker->get_ew(key, i) > C_I + C_M || tracker->get_ew(key, i) == -1))
                 correct_pred += 1;
             else
             {
                 wrong_pred += 1;
-                // std::cout << key << ": tracker ew: " << tracker->get_ew(key) << ", gold ew: " << gold_tracker->get_ew(key) << ", in TopK? " << tracker->is_in_topK(key) << std::endl;
             }
         }
         else
@@ -180,10 +227,10 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
         benchmark_ew_tracker(client.get_tracker(), workload);
     }
 
+    workload->init(parser.scale_factor);
+
     if (skip_exp)
         return;
-
-    workload->init(parser.scale_factor);
 
     client.SetTTL(ttl);
     std::cout << "Begin Warming: " << std::endl;
@@ -200,7 +247,11 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
 
     int operations_per_thread = num_operations / num_threads;
 
-    auto start_time = std::chrono::high_resolution_clock::now();
+    auto start_time = std::chrono::steady_clock::now();
+
+    // std::cout << "SStart time (since epoch): "
+    //           << std::chrono::duration_cast<std::chrono::milliseconds>(start_time.time_since_epoch()).count()
+    //           << " ms\n";
 
     START_COLLECTION(std::string(parser.log_path), client.get_db_client(), client.get_cache_client());
 
@@ -218,7 +269,11 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
     }
 
     // End time measurement
-    auto end_time = std::chrono::high_resolution_clock::now();
+    auto end_time = std::chrono::steady_clock::now();
+
+    // std::cout << "EEnd time (since epoch): "
+    //           << std::chrono::duration_cast<std::chrono::milliseconds>(end_time.time_since_epoch()).count()
+    //           << " ms\n";
 
     // Calculate the e2e latency
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
@@ -238,13 +293,19 @@ void benchmark(Client &client, int ttl, float ew, Parser &parser, int num_thread
     std::cout << "Load: " << load << std::endl;
     std::cout << "End-to-End Latency: " << duration << " ms" << std::endl;
 
-    std::cout << "Average cache latency: " << client.GetCacheAverageLatency() / 1000 << " ms" << std::endl;
-    std::cout << "Average DB latency: " << client.GetDBAverageLatency() / 1000 << " ms" << std::endl;
+    std::cout << "Average cache latency: " << client.GetCacheAverageLatency() << " us" << std::endl;
+    std::cout << "Average DB latency: " << client.GetDBAverageLatency() << " us" << std::endl;
 
-    std::string latency_message = "Average cache latency: " + std::to_string(client.GetCacheAverageLatency() / 1000.0) + " ms";
+    std::string latency_message = "Average cache latency: " + std::to_string(client.GetCacheAverageLatency()) + " us";
     WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
 
-    latency_message = "Average DB latency: " + std::to_string(client.GetDBAverageLatency() / 1000.0) + " ms";
+    latency_message = "Average DB latency: " + std::to_string(client.GetDBAverageLatency()) + " us";
+    WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
+
+    latency_message = "Median cache latency: " + std::to_string(client.GetCacheMedianLatency()) + " us";
+    WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
+
+    latency_message = "Median DB latency: " + std::to_string(client.GetDBMedianLatency()) + " us";
     WRITE_TO_LOG(std::string(parser.log_path), "stats", latency_message);
 
     latency_message = "End-to-End Latency: " + std::to_string(duration) + " ms";
